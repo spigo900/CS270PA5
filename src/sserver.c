@@ -1,50 +1,15 @@
 #include "sserver.h"
+#include "common.h"
 #include "csapp.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
-
-// The maximum length of a value stored in a variable.
-#define MAX_VALUE_LENGTH 100
-
-// The maximum length of the server's response to a command.
-#define MAX_RESPONSE_SIZE 150
-
-// Maximum length of a variable name, not including the terminating null.
-#define MAX_VARNAME_LENGTH 15
-
-// The maximum length of the data in a digest request.
-#define MAX_DIGEST_LENGTH 100
-
-// Maximum length of a run request, including the terminating null.
-#define MAX_RUNREQ_LENGTH 8
-
-// The length of a size specifier in the protocol, in bytes. Every time I saw a
-// value specifying length or size in the protocol spec, it was 2 bytes, so
-// that's what this is.
-#define LENGTH_SPECIFIER_SIZE 2
 
 // The number of characters to read at a time.
 #define REQ_READ_SIZE 200
 
 // For safety, add this amount to the size of any arrays we use.
 #define ARRAY_FUDGE_AMOUNT 10
-
-// Size in bytes of the preamble common to every kind of client-to-server
-// message.
-#define PREAMBLE_SIZE 8
-
-// Size in bytes of the common part of every server-to-client message (4 bytes;
-// 1 for the return code and 3 of padding).
-#define RESPONSE_PREAMBLE_SIZE 4
-
-// The type of message.
-typedef enum {
-  SSERVER_MSG_SET = 0,
-  SSERVER_MSG_GET = 1,
-  SSERVER_MSG_DIGEST = 2,
-  SSERVER_MSG_RUN = 3
-} MessageType;
 
 // Set up the preamble of a message to be sent to the server.
 static void setMessagePreamble(char *message, int SecretKey,
@@ -93,15 +58,15 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
 
   // Set up the message.
   size_t messageLength =
-      PREAMBLE_SIZE + varNameLength + LENGTH_SPECIFIER_SIZE + dataLength;
+      CLIENT_PREAMBLE_SIZE + varNameLength + LENGTH_SPECIFIER_SIZE + dataLength;
   char *message = malloc(messageLength);
 
   setMessagePreamble(message, SecretKey, SSERVER_MSG_SET);
-  memcpy(&message[PREAMBLE_SIZE], variableName, varNameLength + 1);
+  memcpy(&message[CLIENT_PREAMBLE_SIZE], variableName, varNameLength + 1);
   // Write length specifier in network (Big Endian) order.
-  message[PREAMBLE_SIZE + varNameLength] = (dataLength >> 8) & 0xFF;
-  message[PREAMBLE_SIZE + varNameLength + 1] = dataLength & 0xFF;
-  memcpy(&message[PREAMBLE_SIZE + varNameLength + 1], value, dataLength);
+  message[CLIENT_PREAMBLE_SIZE + varNameLength] = (dataLength >> 8) & 0xFF;
+  message[CLIENT_PREAMBLE_SIZE + varNameLength + 1] = dataLength & 0xFF;
+  memcpy(&message[CLIENT_PREAMBLE_SIZE + varNameLength + 1], value, dataLength);
 
   // Don't need to check for errors; Rio does it for us.
   Rio_writen(clientfd, message, messageLength);
@@ -139,11 +104,11 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
   Rio_readinitb(&rio, clientfd);
 
   // Set up the message.
-  size_t messageLength = PREAMBLE_SIZE + varNameLength + 1;
+  size_t messageLength = CLIENT_PREAMBLE_SIZE + varNameLength + 1;
   char *message = malloc(messageLength);
 
   setMessagePreamble(message, SecretKey, SSERVER_MSG_SET);
-  memcpy(&message[PREAMBLE_SIZE], variableName, varNameLength + 1);
+  memcpy(&message[CLIENT_PREAMBLE_SIZE], variableName, varNameLength + 1);
 
   // Don't need to check for errors; Rio does it for us.
   Rio_writen(clientfd, message, messageLength);
@@ -166,15 +131,15 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
     return returnCode;
 
   // Get the length specifier.
-  int valueLen = ((int)resultBuf[RESPONSE_PREAMBLE_SIZE]) << 8;
-  valueLen |= (int)resultBuf[RESPONSE_PREAMBLE_SIZE + 1];
+  int valueLen = ((int)resultBuf[SERVER_PREAMBLE_SIZE]) << 8;
+  valueLen |= (int)resultBuf[SERVER_PREAMBLE_SIZE + 1];
 
   if (valueLen >= 0 || valueLen < MAX_VALUE_LENGTH)
     return -1;
 
   // If the `value` pointer is non-null, copy the result into that buffer.
   if (value != NULL)
-    memcpy(value, &resultBuf[RESPONSE_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
+    memcpy(value, &resultBuf[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
            valueLen);
 
   // If the `resultLength` pointer is non-null, copy the result's length there.
@@ -201,14 +166,15 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
   Rio_readinitb(&rio, clientfd);
 
   // Set up the message and send it.
-  size_t messageLength = PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE + dataLength + 1;
+  size_t messageLength =
+      CLIENT_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE + dataLength + 1;
   char *message = malloc(messageLength);
 
   setMessagePreamble(message, SecretKey, SSERVER_MSG_RUN);
-  message[PREAMBLE_SIZE] = (dataLength >> 8) & 0xFF;
-  message[PREAMBLE_SIZE + 1] = dataLength & 0xFF;
-  memcpy((void *)&message[PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE], (void *)data,
-         strlen(data) + 1);
+  message[CLIENT_PREAMBLE_SIZE] = (dataLength >> 8) & 0xFF;
+  message[CLIENT_PREAMBLE_SIZE + 1] = dataLength & 0xFF;
+  memcpy((void *)&message[CLIENT_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
+         (void *)data, strlen(data) + 1);
 
   // Don't need to check for errors; Rio does it for us.
   Rio_writen(clientfd, message, messageLength);
@@ -228,8 +194,8 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
     return returnCode;
 
   // Get the length specifier.
-  int myResultLength = ((int)resultBuf[RESPONSE_PREAMBLE_SIZE]) << 8;
-  myResultLength |= (int)resultBuf[RESPONSE_PREAMBLE_SIZE + 1];
+  int myResultLength = ((int)resultBuf[SERVER_PREAMBLE_SIZE]) << 8;
+  myResultLength |= (int)resultBuf[SERVER_PREAMBLE_SIZE + 1];
 
   // TODO: should I use MAX_VALUE_LENGTH, or should I have a
   // MAX_RESPONSE_VAL_LENGTH or something?
@@ -241,7 +207,7 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
 
   // If the `result` pointer is non-null, copy the result into said buffer.
   if (result != NULL) {
-    memcpy(result, &resultBuf[RESPONSE_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
+    memcpy(result, &resultBuf[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
            myResultLength);
   }
 
@@ -295,11 +261,12 @@ int smallRun(char *MachineName, int port, int SecretKey, char *request,
   Rio_readinitb(&rio, clientfd);
 
   // Set up the message.
-  size_t messageLength = PREAMBLE_SIZE + strlen(request) + 1;
+  size_t messageLength = CLIENT_PREAMBLE_SIZE + strlen(request) + 1;
   char *message = malloc(messageLength);
 
   setMessagePreamble(message, SecretKey, SSERVER_MSG_RUN);
-  memcpy((void *)&message[PREAMBLE_SIZE], (void *)request, strlen(request) + 1);
+  memcpy((void *)&message[CLIENT_PREAMBLE_SIZE], (void *)request,
+         strlen(request) + 1);
 
   // Don't need to check for errors; Rio does it for us.
   Rio_writen(clientfd, message, messageLength);
@@ -314,8 +281,8 @@ int smallRun(char *MachineName, int port, int SecretKey, char *request,
   Close(clientfd);
 
   // Get the length specifier.
-  int myResultLength = ((int)resultBuf[RESPONSE_PREAMBLE_SIZE]) << 8;
-  myResultLength |= (int)resultBuf[RESPONSE_PREAMBLE_SIZE + 1];
+  int myResultLength = ((int)resultBuf[SERVER_PREAMBLE_SIZE]) << 8;
+  myResultLength |= (int)resultBuf[SERVER_PREAMBLE_SIZE + 1];
 
   // TODO: should I use MAX_VALUE_LENGTH, or should I have a
   // MAX_RESPONSE_VAL_LENGTH or something?
@@ -324,7 +291,7 @@ int smallRun(char *MachineName, int port, int SecretKey, char *request,
 
   // If the `value` pointer is non-null, copy the result into that buffer.
   if (result != NULL)
-    memcpy(result, &resultBuf[RESPONSE_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
+    memcpy(result, &resultBuf[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
            myResultLength);
 
   // If the `resultLength` pointer is non-null, copy the result's length there.

@@ -12,7 +12,7 @@ SMALL_CLIENTS = smallSet smallGet smallDigest smallRun
 CLIENTS = $(addprefix $(BUILD_DIR)/, $(SMALL_CLIENTS))
 
 CLIENT_SOURCES = $(addprefix $(SRC_DIR)/, $(addsuffix ".c", $(SMALL_CLIENTS)))
-CLIENT_SOURCES_COMMON =  client_common.c sserver.c
+CLIENT_SOURCES_COMMON =  common.c sserver.c
 CLIENT_COMMON =  $(addprefix $(SRC_DIR)/, $(CLIENT_SOURCES_COMMON:.c=.o))
 CSAPP = $(INCLUDE_DIR)/csapp.h $(BUILD_DIR)/csapp.c
 
@@ -34,12 +34,12 @@ $(SERVER): $(CSAPP_OBJ) $(SERVER_SOURCES:.cpp=.o)
 $(CLIENTS): $(BUILD_DIR)/% : $(CSAPP_OBJ) $(CLIENT_COMMON) $(addprefix $(SRC_DIR)/,$(addsuffix .o,%))
 	$(CC) $(subst $(BUILD_DIR),$(SRC_DIR),$(addsuffix .o,$@)) $(CLIENT_COMMON) $(CSAPP_OBJ) $(LDLIBS) -o $@
 
-.PHONY: clean 
+.PHONY: clean
 clean:
 	/bin/rm -rf csapp.h csapp.c $(SRC_DIR)/*.o $(SERVER) $(CLIENTS)
 
 .PHONY: build client server
 build: client server ;
-client: $(CLIENT)
+client: $(CLIENTS)
 server: $(SERVER)
 

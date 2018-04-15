@@ -1,4 +1,4 @@
-#include "client_common.h"
+#include "common.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

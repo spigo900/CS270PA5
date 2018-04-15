@@ -1,10 +1,7 @@
-#include "client_common.h"
+#include "common.h"
 #include "sserver.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-// Maximum size of the server's response.
-#define MAX_RESPONSE_SIZE 100
 
 // Amount of extra space to use for the response buffer. Just in case we get
 // more data than we're expecting.
@@ -19,26 +16,12 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  // Parse the arguments.
+  // Parse the arguments and handle any errors that come up.
   char *MachineName = argv[1], *command = argv[4];
   int port;
   int SecretKey;
 
   // Read the port, the secret key.
-  /*
-  strtol(argv[2], NULL, BASE);
-  if (errno != 0) {
-      fprintf(stderr, "Error: Port must be a number.");
-      exit(1);
-  }
-
-  // Read the secret key.
-  strtol(argv[3], NULL, BASE);
-  if (errno != 0) {
-      fprintf(stderr, "Error: Secret key must be a number.");
-      exit(1);
-  }
-  */
   port = parseIntWithError(argv[2], "Error: Port must be a number.\n");
   SecretKey =
       parseIntWithError(argv[3], "Error: Secret key must be a number.\n");
