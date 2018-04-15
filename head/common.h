@@ -1,6 +1,9 @@
 // The maximum length of a value stored in a variable.
 #define MAX_VALUE_LENGTH 100
 
+// The maximum length of one of the client's requests.
+#define MAX_REQUEST_SIZE 150
+
 // The maximum length of the server's response to a command.
 #define MAX_RESPONSE_SIZE 150
 
@@ -37,3 +40,4 @@ typedef enum {
 
 
 int parseIntWithError(char* toParse, const char* errorMsg);
+int isValidRunRequest(char *runRequest);

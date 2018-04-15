@@ -3,7 +3,7 @@ INCLUDE_DIR = head
 BUILD_DIR = build
 CSAPP_OBJ = $(BUILD_DIR)/csapp.o
 CFLAGS = -Wall -g -I$(INCLUDE_DIR)
-CXXFLAGS = -Wall -g -I$(INCLUDE_DIR)
+CXXFLAGS = -Wall -g -I$(INCLUDE_DIR) -std=c++11
 LDLIBS = -lpthread
 
 SERVER = $(BUILD_DIR)/smalld

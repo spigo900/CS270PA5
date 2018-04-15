@@ -218,30 +218,6 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
   return 0;
 }
 
-// VALID_RUN_REQUESTS describes the number of distinct valid run request
-// strings. validRunRequests describes the actual valid run request strings.
-//
-// Using a #define'd constant is not ideal since it could get out of sync with
-// the array, but I'm not sure if there's a better solution.
-#define VALID_RUN_REQUESTS 3
-static const char *validRunRequests[] = {"inet", "hosts", "services"};
-
-// Check whether the given request string is valid (i.e. is one of inet, hosts,
-// or services).
-static int isValidRunRequest(char *runRequest) {
-  // Assume the run request string isn't valid and check if it's actually
-  // valid.
-  int isValid = 0;
-
-  for (int i = 0; i < VALID_RUN_REQUESTS; i++) {
-    isValid |= strcmp(runRequest, validRunRequests[i]);
-    if (isValid)
-      break;
-  }
-
-  return isValid;
-}
-
 // Run the program specified by `request` on the server at MachineName:port and
 // write the response to the memory pointed to by `result`, with length written
 // to `resultLength`. The result will be at most 100 bytes long.
