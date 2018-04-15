@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 
   if (strlen(value) > MAX_VALUE_LENGTH) {
     fprintf(stderr, "Error: Value must be at most %u bytes, "
-                    "including terminating null (got %u).\n",
+                    "including terminating null (got %zu).\n",
             MAX_VARNAME_LENGTH, strlen(value) + 1);
     exit(1);
   }
