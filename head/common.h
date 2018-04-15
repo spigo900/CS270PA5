@@ -36,4 +36,4 @@ typedef enum {
 
 
 
-int parseIntWithError(char* toParse, char* errorMsg);
+int parseIntWithError(char* toParse, const char* errorMsg);
