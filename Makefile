@@ -12,8 +12,11 @@ SMALL_CLIENTS = smallSet smallGet smallDigest smallRun
 CLIENTS = $(addprefix $(BUILD_DIR)/, $(SMALL_CLIENTS))
 
 CLIENT_SOURCES = $(addprefix $(SRC_DIR)/, $(addsuffix ".c", $(SMALL_CLIENTS)))
-CLIENT_SOURCES_COMMON =  common.c sserver.c
+CLIENT_SOURCES_COMMON = common.c sserver.c
 CLIENT_COMMON =  $(addprefix $(SRC_DIR)/, $(CLIENT_SOURCES_COMMON:.c=.o))
+
+COMMON_SRC = $(SRC_DIR)/common.c
+COMMON = $(COMMON_SRC:.c=.o)
 CSAPP = $(INCLUDE_DIR)/csapp.h $(BUILD_DIR)/csapp.c
 
 all: $(CSAPP) $(SERVER) $(CLIENTS)
@@ -26,8 +29,8 @@ $(BUILD_DIR)/csapp.c:
 
 $(CSAPP_OBJ): $(INCLUDE_DIR)/csapp.h $(BUILD_DIR)/csapp.c
 
-$(SERVER): $(CSAPP_OBJ) $(SERVER_SOURCES:.cpp=.o)
-	$(CXX) $(SERVER_SOURCES:.cpp=.o) $(LDLIBS) -o $(SERVER)
+$(SERVER): $(CSAPP_OBJ) $(COMMON) $(SERVER_SOURCES:.cpp=.o)
+	$(CXX) $(SERVER_SOURCES:.cpp=.o) $(COMMON) $(CSAPP_OBJ) $(LDLIBS) -o $(SERVER)
 
 # TODO: fix this fucking thing
 # $(subst $(BUILD_DIR),$(SRC_DIR),%.o)
