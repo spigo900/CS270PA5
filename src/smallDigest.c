@@ -28,9 +28,8 @@ int main(int argc, char *argv[]) {
       parseIntWithError(argv[3], "Error: Secret key must be a number.\n");
 
   char resultBuf[MAX_RESPONSE_SIZE + FUDGE_AMOUNT];
-  int resultLen;
   int success = smallDigest(MachineName, port, SecretKey, value,
-                            strlen(value) + 1, resultBuf, &resultLen);
+                            strlen(value) + 1, resultBuf, NULL);
 
   if (success != 0)
     fprintf(stderr, "failed\n");
