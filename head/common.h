@@ -43,7 +43,7 @@ typedef enum {
 typedef struct {
   unsigned int secretKey;
   char msgType;
-  char junk[3];
+  char junk[2];
 } ClientPreamble;
 
 typedef struct {
