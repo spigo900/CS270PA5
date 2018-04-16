@@ -1,6 +1,7 @@
 #include "sserver.h"
 #include "common.h"
 #include "csapp.h"
+#include <arpa/inet.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,17 +37,10 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   // Set up some variable names ahead of time.
   int varNameLength = strlen(variableName);
 
-  // TODO: Merge all these conditions into one if-statement?
-  // If the given variable name is too long, signal failure.
-  if (varNameLength > MAX_VARNAME_LENGTH)
-    return -1;
-
-  // If the given value is too long, signal failure.
-  if (dataLength > MAX_VALUE_LENGTH)
-    return -1;
-
-  // If no value was given, signal failure.
-  if (dataLength <= 0)
+  // If we were given bad input -- the variable name is too long, the data is
+  // too long, or we got a negative data length -- signal failure.
+  if (varNameLength > MAX_VARNAME_LENGTH || dataLength > MAX_VALUE_LENGTH ||
+      dataLength < 0)
     return -1;
 
   // Set up the clientfd and Rio ID.
@@ -57,29 +51,27 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   Rio_readinitb(&rio, clientfd);
 
   // Set up the message.
-  size_t messageLength =
-      CLIENT_PREAMBLE_SIZE + varNameLength + LENGTH_SPECIFIER_SIZE + dataLength;
-  char *message = malloc(messageLength);
+  size_t messageLength = CLIENT_PREAMBLE_SIZE + (MAX_VARNAME_LENGTH + 1) +
+                         LENGTH_SPECIFIER_SIZE + dataLength;
 
-  setMessagePreamble(message, SecretKey, SSERVER_MSG_SET);
-  memcpy(&message[CLIENT_PREAMBLE_SIZE], variableName, varNameLength + 1);
-  // Write length specifier in network (Big Endian) order.
-  message[CLIENT_PREAMBLE_SIZE + varNameLength] = (dataLength >> 8) & 0xFF;
-  message[CLIENT_PREAMBLE_SIZE + varNameLength + 1] = dataLength & 0xFF;
-  memcpy(&message[CLIENT_PREAMBLE_SIZE + varNameLength + 1], value, dataLength);
+  ClientSet message;
+  message.pre.secretKey = htonl(SecretKey);
+  message.pre.msgType = SSERVER_MSG_SET;
+
+  memcpy(&message.varName, variableName, varNameLength + 1);
+  message.length = htons(dataLength);
+  memcpy(&message.value, value, dataLength);
 
   // Don't need to check for errors; Rio does it for us.
-  Rio_writen(clientfd, message, messageLength);
-
-  free(message);
+  Rio_writen(clientfd, &message, messageLength);
 
   // Read the server's response.
-  char resultBuf[MAX_RESPONSE_SIZE];
-  Rio_readlineb(&rio, resultBuf, MAX_RESPONSE_SIZE);
+  ServerResponse response;
+  Rio_readlineb(&rio, &response, sizeof(response));
   Close(clientfd);
 
   // Read and return the server's return code.
-  int returnCode = (int)resultBuf[0];
+  int returnCode = (int)response.status;
 
   return returnCode;
 }

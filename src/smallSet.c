@@ -9,9 +9,9 @@
 #define FUDGE_AMOUNT 10
 
 int main(int argc, char *argv[]) {
-  // Need 5 arguments: The program name, machine name, port, secret key, and
-  // the value to digest.
-  if (argc != 5) {
+  // Need 6 arguments: The program name, machine name, port, secret key, the
+  // variable name, and the value to associate with the variable name.
+  if (argc != 6) {
     fprintf(stderr, "Usage: %s <machine name> <port> <secret key> <variable "
                     "name> <value>\n",
             argv[0]);
@@ -28,25 +28,22 @@ int main(int argc, char *argv[]) {
       parseIntWithError(argv[3], "Error: Secret key must be a number.\n");
 
   if (strlen(varName) > MAX_VARNAME_LENGTH) {
-    fprintf(stderr, "Error: Variable name must be at most %d characters.\n",
-            MAX_VARNAME_LENGTH);
+    fprintf(stderr,
+            "Error: Variable name must be at most %d characters (got %zu).\n",
+            MAX_VARNAME_LENGTH, strlen(varName));
     exit(1);
   }
 
   if (strlen(value) > MAX_VALUE_LENGTH) {
     fprintf(stderr, "Error: Value must be at most %u bytes, "
                     "including terminating null (got %zu).\n",
-            MAX_VARNAME_LENGTH, strlen(value) + 1);
+            MAX_VALUE_LENGTH, strlen(value) + 1);
     exit(1);
   }
 
-  char resultBuf[MAX_RESPONSE_SIZE + FUDGE_AMOUNT];
-  int resultLen;
-  int success = smallDigest(MachineName, port, SecretKey, value,
-                            strlen(value) + 1, resultBuf, &resultLen);
+  int success =
+      smallSet(MachineName, port, SecretKey, varName, value, strlen(value) + 1);
 
   if (success != 0)
-    fprintf(stderr, "failed");
-  else
-    printf("%s", resultBuf);
+    fprintf(stderr, "failed\n");
 }

@@ -13,6 +13,9 @@
 // The maximum length of the data in a digest request.
 #define MAX_DIGEST_LENGTH 100
 
+// The maximum length of the data in the server's response to a request.
+#define MAX_SERVER_DATA_LENGTH 100
+
 // Maximum length of a run request, including the terminating null.
 #define MAX_RUNREQ_LENGTH 8
 
@@ -37,7 +40,41 @@ typedef enum {
   SSERVER_MSG_RUN = 3
 } MessageType;
 
+typedef struct {
+  unsigned int secretKey;
+  char msgType;
+  char junk[3];
+} ClientPreamble;
 
+typedef struct {
+  ClientPreamble pre;
+  char varName[MAX_VARNAME_LENGTH + 1];
+  unsigned short length;
+  char value[MAX_VALUE_LENGTH];
+} ClientSet;
 
-int parseIntWithError(char* toParse, const char* errorMsg);
+typedef struct {
+  ClientPreamble pre;
+  char varName[MAX_VARNAME_LENGTH + 1];
+} ClientGet;
+
+typedef struct {
+  ClientPreamble pre;
+  unsigned short length;
+  char value[MAX_DIGEST_LENGTH];
+} ClientDigest;
+
+typedef struct {
+  ClientPreamble pre;
+  char request[MAX_RUNREQ_LENGTH];
+} ClientRun;
+
+typedef struct {
+  char status;
+  char junk[3];
+  unsigned short length;
+  char data[MAX_SERVER_DATA_LENGTH];
+} ServerResponse;
+
+int parseIntWithError(char *toParse, const char *errorMsg);
 int isValidRunRequest(char *runRequest);
