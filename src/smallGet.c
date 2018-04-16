@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
       smallGet(MachineName, port, SecretKey, varName, resultBuf, &resultLen);
 
   if (success != 0)
-    fprintf(stderr, "failed");
+    fprintf(stderr, "failed\n");
   else
     printf("%s\n", resultBuf);
 }

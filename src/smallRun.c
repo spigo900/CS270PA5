@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
   int success =
       smallRun(MachineName, port, SecretKey, command, response, &responseLen);
   if (success != 0)
-    fprintf(stderr, "failed");
+    fprintf(stderr, "failed\n");
   else
-    printf("%s", response);
+    printf("%s\n", response);
 }

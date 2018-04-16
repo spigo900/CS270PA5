@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
                             strlen(value) + 1, resultBuf, &resultLen);
 
   if (success != 0)
-    fprintf(stderr, "failed");
+    fprintf(stderr, "failed\n");
   else
-    printf("%s", resultBuf);
+    printf("%s\n", resultBuf);
 }
