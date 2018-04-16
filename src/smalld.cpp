@@ -20,12 +20,6 @@ using std::endl;
 // responding to a client's request.
 const size_t CONN_BUFFER_SIZE = 200;
 
-// Preamble of a message from the client.
-struct ClientPreamble {
-  unsigned int secretKey;
-  uint16_t type; // one of MessageType
-};
-
 //===================
 // Helper functions.
 //===================
