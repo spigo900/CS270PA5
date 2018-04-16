@@ -43,5 +43,5 @@ int main(int argc, char *argv[]) {
   if (success != 0)
     fprintf(stderr, "failed");
   else
-    printf("%s", resultBuf);
+    printf("%s\n", resultBuf);
 }
