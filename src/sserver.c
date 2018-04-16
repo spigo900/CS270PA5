@@ -12,24 +12,6 @@
 // For safety, add this amount to the size of any arrays we use.
 #define ARRAY_FUDGE_AMOUNT 10
 
-// Set up the preamble of a message to be sent to the server.
-static void setMessagePreamble(char *message, int SecretKey,
-                               MessageType msgtype) {
-  // Write the integer SecretKey to the first four (0-3) bytes in network (Big
-  // Endian) order.
-  message[0] = (SecretKey >> 24) & 0xFF;
-  message[1] = (SecretKey >> 16) & 0xFF;
-  message[2] = (SecretKey >> 8) & 0xFF;
-  message[3] = SecretKey & 0xFF;
-
-  // Write out the bytes of the message type. The message type is technically
-  // a 2-byte integer following the spec, thus this writes both bytes even
-  // though the higher order byte will always be 0. Once again, we write it in
-  // network (Big Endian) order.
-  message[4] = (msgtype >> 8) & 0xFF;
-  message[5] = msgtype & 0xFF;
-}
-
 // Send a message to the host described by `machineName` on port `port`, and
 // read the response into `response`.
 static void sendMessage(char *machineName, int port, void *message,
