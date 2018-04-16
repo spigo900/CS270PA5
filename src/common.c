@@ -24,15 +24,19 @@ int parseIntWithError(char *toParse, const char *errorMsg) {
 #define VALID_RUN_REQUESTS 3
 static const char *validRunRequests[] = {"inet", "hosts", "services"};
 
-// Check whether the given request string is valid (i.e. is one of inet, hosts,
-// or services).
+// Check whether the given request string is valid (i.e. is one of 'inet',
+// 'hosts', or 'services' and is shorter than MAX_RUNREQ_LENGTH).
 int isValidRunRequest(char *runRequest) {
+  // Check that the string is short enough, first of all.
+  if (strlen(runRequest) >= MAX_RUNREQ_LENGTH) return 0;
+
   // Assume the run request string isn't valid and check if it's actually
   // valid.
   int isValid = 0;
 
   for (int i = 0; i < VALID_RUN_REQUESTS; i++) {
-    isValid |= strcmp(runRequest, validRunRequests[i]);
+    int matched = strcmp(runRequest, validRunRequests[i]) == 0;
+    isValid |= matched;
     if (isValid)
       break;
   }

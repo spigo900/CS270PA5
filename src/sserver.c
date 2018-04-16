@@ -216,64 +216,48 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
 int smallRun(char *MachineName, int port, int SecretKey, char *request,
              char *result, int *resultLength) {
   // If the given request isn't valid, return -1 to signal failure.
-  if (!isValidRunRequest(request) ||
-      (strlen(request) + 1) > MAX_RUNREQ_LENGTH) {
+  if (!isValidRunRequest(request)) {
     return -1;
   }
 
-  // Set up the clientfd and Rio ID.
-  int clientfd;
-  rio_t rio;
-
-  clientfd = Open_clientfd(MachineName, port);
-  Rio_readinitb(&rio, clientfd);
-
   // Set up the message.
-  size_t messageLength = CLIENT_PREAMBLE_SIZE + strlen(request) + 1;
-  char *message = malloc(messageLength);
+  size_t messageLength = CLIENT_PREAMBLE_SIZE + MAX_RUNREQ_LENGTH;
 
-  setMessagePreamble(message, SecretKey, SSERVER_MSG_RUN);
-  memcpy((void *)&message[CLIENT_PREAMBLE_SIZE], (void *)request,
-         strlen(request) + 1);
+  ClientRun message;
+  message.pre.secretKey = htonl(SecretKey);
+  message.pre.msgType = htons(SSERVER_MSG_RUN);
+  memcpy(&message.request, request, strlen(request) + 1);
 
-  // Don't need to check for errors; Rio does it for us.
-  Rio_writen(clientfd, message, messageLength);
+  // Send the message and get the response.
+  ServerResponse response;
+  sendMessage(MachineName, port, &message, messageLength, &response,
+              sizeof(response));
 
-  free(message);
+  // Read and return the server's return code.
+  int returnCode = (int)response.status;
 
-  // Read the response, copy it, and close the connection.
-  char resultBuf[MAX_RESPONSE_SIZE];
-  // NOTE: this doesn't stop at a null as far as I can tell. I'm not sure if
-  // that will make a difference.
-  Rio_readlineb(&rio, resultBuf, MAX_RESPONSE_SIZE);
-  Close(clientfd);
+  // If we got a failure result, exit early with that result.
+  if (returnCode < 0)
+    return returnCode;
 
   // Get the length specifier.
-  int myResultLength = ((int)resultBuf[SERVER_PREAMBLE_SIZE]) << 8;
-  myResultLength |= (int)resultBuf[SERVER_PREAMBLE_SIZE + 1];
+  int resultLen = (int)ntohs(response.length);
 
-  // TODO: should I use MAX_VALUE_LENGTH, or should I have a
-  // MAX_RESPONSE_VAL_LENGTH or something?
-  if (myResultLength >= 0 || myResultLength < MAX_VALUE_LENGTH)
+  // If specifier is negative or longer than max, signal an error.
+  if (resultLen < 0 || resultLen > MAX_SERVER_DATA_LENGTH)
     return -1;
 
-  // If the `value` pointer is non-null, copy the result into that buffer.
+  // If the `result` pointer is non-null, copy the result into that buffer. We
+  // assume that `value` already points to a valid chunk of memory long enough
+  // to hold any value. This might or might not be a good assumption to make...
+  // in any case I think we'd have to take a `char**` parameter if we wanted to
+  // malloc() the space ourselves.
   if (result != NULL)
-    memcpy(result, &resultBuf[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
-           myResultLength);
+    memcpy(result, &response.data, resultLen);
 
   // If the `resultLength` pointer is non-null, copy the result's length there.
   if (resultLength != NULL)
-    *resultLength = myResultLength;
+    *resultLength = resultLen;
 
-  // Copy the result and its length into `result` and `resultLength`,
-  // respectively, if they're non-null.
-  if (result != NULL) {
-    memcpy(result, resultBuf, strlen(resultBuf) + 1);
-  }
-
-  if (resultLength != NULL)
-    *resultLength = strlen(resultBuf) + 1;
-
-  return 0;
+  return returnCode;
 }
