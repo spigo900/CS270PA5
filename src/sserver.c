@@ -49,8 +49,9 @@ static void sendMessage(char *machineName, int port, void *message,
   Close(clientfd);
 }
 
-// Set the value of variable `variableName` to value on the server at
-// MachineName:port, where value is some data of length `dataLength`.
+// Set the value of variable `variableName` (a null-terminated string) to value
+// on the server at MachineName:port, where value is some data of length
+// `dataLength`.
 int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
              char *value, int dataLength) {
   // Set up some variable names ahead of time.
@@ -77,7 +78,8 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   // Send our message and get the server's response.
   ServerResponse response;
 
-  sendMessage(MachineName, port, message, messageLength, response, sizeof(response));
+  sendMessage(MachineName, port, &message, messageLength, &response,
+              sizeof(response));
 
   // Read and return the server's return code.
   int returnCode = (int)response.status;
@@ -85,9 +87,9 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   return returnCode;
 }
 
-// Get the value of variable `variableName` on the server at MachineName:port,
-// writing the result to `value` and storing the length of the result into the
-// int pointed to by `resultLength`.
+// Get the value of variable `variableName` (a null-terminated string) on the
+// server at MachineName:port, writing the result to `value` and storing the
+// length of the result into the int pointed to by `resultLength`.
 int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
              char *value, int *resultLength) {
   // Set up some variable names ahead of time.
@@ -97,51 +99,40 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
   if (varNameLength > MAX_VARNAME_LENGTH)
     return -1;
 
-  // Set up the clientfd and Rio ID.
-  int clientfd;
-  rio_t rio;
-
-  clientfd = Open_clientfd(MachineName, port);
-  Rio_readinitb(&rio, clientfd);
-
   // Set up the message.
-  size_t messageLength = CLIENT_PREAMBLE_SIZE + varNameLength + 1;
-  char *message = malloc(messageLength);
+  size_t messageLength = CLIENT_PREAMBLE_SIZE + (MAX_VARNAME_LENGTH + 1);
 
-  setMessagePreamble(message, SecretKey, SSERVER_MSG_SET);
-  memcpy(&message[CLIENT_PREAMBLE_SIZE], variableName, varNameLength + 1);
-
-  // Don't need to check for errors; Rio does it for us.
-  Rio_writen(clientfd, message, messageLength);
-
-  // Clean up.
-  free(message);
+  ClientGet message;
+  message.pre.secretKey = htonl(SecretKey);
+  message.pre.msgType = SSERVER_MSG_GET;
+  memcpy(&message.varName, variableName, varNameLength + 1);
 
   // Read the response, copy it, and close the connection.
-  // TODO: I should probably check up whether Rio_readlineb stops at a null.
-  // 'Cause that makes a difference.
-  char resultBuf[MAX_RESPONSE_SIZE];
-  Rio_readlineb(&rio, resultBuf, MAX_RESPONSE_SIZE);
-  Close(clientfd);
+  ServerResponse response;
+  sendMessage(MachineName, port, &message, messageLength, &response,
+              sizeof(response));
 
   // Read and return the server's return code.
-  int returnCode = (int)resultBuf[0];
+  int returnCode = (int)response.status;
 
   // If we got a failure result, exit early with that result.
   if (returnCode < 0)
     return returnCode;
 
   // Get the length specifier.
-  int valueLen = ((int)resultBuf[SERVER_PREAMBLE_SIZE]) << 8;
-  valueLen |= (int)resultBuf[SERVER_PREAMBLE_SIZE + 1];
+  int valueLen = (int)ntohs(response.length);
 
-  if (valueLen >= 0 || valueLen < MAX_VALUE_LENGTH)
+  // If specifier is negative or longer than max, signal an error.
+  if (valueLen < 0 || valueLen > MAX_VALUE_LENGTH)
     return -1;
 
-  // If the `value` pointer is non-null, copy the result into that buffer.
+  // If the `value` pointer is non-null, copy the result into that buffer. We
+  // assume that `value` already points to a valid chunk of memory long enough
+  // to hold any value. This might or might not be a good assumption to make...
+  // in any case I think we'd have to take a `char**` parameter if we wanted to
+  // malloc() the space ourselves.
   if (value != NULL)
-    memcpy(value, &resultBuf[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE],
-           valueLen);
+    memcpy(value, &response.data, valueLen);
 
   // If the `resultLength` pointer is non-null, copy the result's length there.
   if (resultLength != NULL)
