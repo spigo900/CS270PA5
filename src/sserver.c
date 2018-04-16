@@ -45,7 +45,7 @@ static void sendMessage(char *machineName, int port, void *message,
 
   // Write our message, get the response, then clean up.
   Rio_writen(clientfd, message, messageLength);
-  Rio_readlineb(&rio, response, maxResponseSize);
+  Rio_readnb(&rio, response, maxResponseSize);
   Close(clientfd);
 }
 
