@@ -30,6 +30,25 @@ static void setMessagePreamble(char *message, int SecretKey,
   message[5] = msgtype & 0xFF;
 }
 
+// Send a message to the host described by `machineName` on port `port`, and
+// read the response into `response`.
+static void sendMessage(char *machineName, int port, void *message,
+                        size_t messageLength, void *response,
+                        size_t maxResponseSize) {
+  int clientfd;
+  rio_t rio;
+
+  // Open a connection and set up the Rio type thing. We don't need to check
+  // for errors; Rio does it for us.
+  clientfd = Open_clientfd(machineName, port);
+  Rio_readinitb(&rio, clientfd);
+
+  // Write our message, get the response, then clean up.
+  Rio_writen(clientfd, message, messageLength);
+  Rio_readlineb(&rio, response, maxResponseSize);
+  Close(clientfd);
+}
+
 // Set the value of variable `variableName` to value on the server at
 // MachineName:port, where value is some data of length `dataLength`.
 int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
@@ -43,13 +62,6 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
       dataLength < 0)
     return -1;
 
-  // Set up the clientfd and Rio ID.
-  int clientfd;
-  rio_t rio;
-
-  clientfd = Open_clientfd(MachineName, port);
-  Rio_readinitb(&rio, clientfd);
-
   // Set up the message.
   size_t messageLength = CLIENT_PREAMBLE_SIZE + (MAX_VARNAME_LENGTH + 1) +
                          LENGTH_SPECIFIER_SIZE + dataLength;
@@ -62,13 +74,10 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   message.length = htons(dataLength);
   memcpy(&message.value, value, dataLength);
 
-  // Don't need to check for errors; Rio does it for us.
-  Rio_writen(clientfd, &message, messageLength);
-
-  // Read the server's response.
+  // Send our message and get the server's response.
   ServerResponse response;
-  Rio_readlineb(&rio, &response, sizeof(response));
-  Close(clientfd);
+
+  sendMessage(MachineName, port, message, messageLength, response, sizeof(response));
 
   // Read and return the server's return code.
   int returnCode = (int)response.status;
