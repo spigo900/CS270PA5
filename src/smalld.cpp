@@ -3,8 +3,8 @@
 #include <iostream>
 #include <map>
 #include <string>
-#include <vector>
 #include <unistd.h>
+#include <vector>
 extern "C" {
 #include "common.h"
 #include "csapp.h"
@@ -26,21 +26,17 @@ const size_t CONN_BUFFER_SIZE = 200;
 
 // Read the preamble of a client's request into a struct.
 ClientPreamble readPreamble(char clientRequest[]) {
-  // Read the preamble. Have to read byte in network order, i.e. Big Endian.
+  // Read the preamble from the bytes. Don't bother swapping them to host
+  // order; we'll do that later.
   ClientPreamble preamble{0, 0};
-  preamble.secretKey = ((int)clientRequest[0]) << 24;
-  preamble.secretKey |= ((int)clientRequest[1]) << 16;
-  preamble.secretKey |= ((int)clientRequest[2]) << 8;
-  preamble.secretKey |= ((int)clientRequest[3]);
-
-  preamble.type = clientRequest[4] << 8;
-  preamble.type |= clientRequest[5];
-
+  preamble.secretKey = *(unsigned int *)&clientRequest[0];
+  preamble.msgType =
+      *(unsigned short *)&clientRequest[sizeof(preamble.secretKey)];
   return preamble;
 }
 
 // Get the digest value of the value using /bin/sha256sum.
-string digest(int valueLength, const char* value) {
+string digest(int valueLength, const char *value) {
   // Set up pipes.
   int stdinCopy = dup(STDIN_FILENO);
   int stdoutCopy = dup(STDOUT_FILENO);
@@ -202,7 +198,7 @@ bool digestResponse(int clientfd, int requestLen, char clientRequest[],
   valueLength = ((unsigned short)clientRequest[0]) << 8;
   valueLength |= (unsigned short)clientRequest[1];
 
-  // If the value's length is out of range, 
+  // If the value's length is out of range,
   if (valueLength > MAX_VARNAME_LENGTH) {
     result = -1;
   }
@@ -220,7 +216,8 @@ bool digestResponse(int clientfd, int requestLen, char clientRequest[],
   const int MAX_COMMAND_LENGTH = 60 + MAX_VALUE_LENGTH;
   // NOTE: Is snprintf a security vulnerability here?
   char command[MAX_COMMAND_LENGTH];
-  snprintf(command, MAX_COMMAND_LENGTH, "/bin/echo '%100s' | /bin/sha256sum", value);
+  snprintf(command, MAX_COMMAND_LENGTH, "/bin/echo '%100s' | /bin/sha256sum",
+  value);
 
   // Copy the value.
   //
@@ -231,20 +228,20 @@ bool digestResponse(int clientfd, int requestLen, char clientRequest[],
             value);
   */
 
-
   // Get the digest.
   string out = digest(valueLength, value);
 
   char connBuffer[CONN_BUFFER_SIZE];
-  connBuffer[0] = (char) result;
+  connBuffer[0] = (char)result;
 
   // The length of out, including the final null.
   int outLengthNull = out.length() + 1;
-  std::copy(
-      out.begin(),
-      out.begin() + (outLengthNull > MAX_DIGEST_LENGTH ? MAX_DIGEST_LENGTH : outLengthNull),
-      &connBuffer[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE]);
-  connBuffer[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE + outLengthNull] = '\0';
+  std::copy(out.begin(),
+            out.begin() + (outLengthNull > MAX_DIGEST_LENGTH ? MAX_DIGEST_LENGTH
+                                                             : outLengthNull),
+            &connBuffer[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE]);
+  connBuffer[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE + outLengthNull] =
+      '\0';
 
   // Write out the response.
   Rio_writen(clientfd, connBuffer, outLengthNull);
@@ -333,26 +330,30 @@ void handleClient(int connfd, unsigned int secretKey) {
   if (requestLen < CLIENT_PREAMBLE_SIZE) /* HANDLE */
     ;
 
-  // Read the preamble
+  // Read the preamble and process the info to get the host-order information
+  // we need.
   ClientPreamble preamble = readPreamble(clientRequest);
+  unsigned int theirKey = ntohl(preamble.secretKey);
+  MessageType rqType = (MessageType)ntohs(preamble.msgType);
 
   // TODO: Do something if the client's secret key isn't right.
-  if (preamble.secretKey != secretKey) {
+  if (theirKey != secretKey) {
     // STUFF
   };
 
   // Handle the actual request.
-  ResponseFunction handler = lookupHandler((MessageType)preamble.type);
+  ResponseFunction handler = lookupHandler(rqType);
 
   string detail;
-  bool status = handler(connfd, requestLen - CLIENT_PREAMBLE_SIZE, clientRequest, detail);
+  bool status = handler(connfd, requestLen - CLIENT_PREAMBLE_SIZE,
+                        &clientRequest[CLIENT_PREAMBLE_SIZE], detail);
   string statusGloss = status ? "success" : "failure";
 
   // Log request information. Could possibly be extracted into another function
   // to make this one shorter, but it's not used anywhere else, so I'm not sure
   // if it's worth it.
   cerr << "Secret key = " << preamble.secretKey << endl
-       << "Request type = " << getRequestTypeName((MessageType)preamble.type) << endl
+       << "Request type = " << getRequestTypeName(rqType) << endl
        << "Detail = " << detail << endl
        << "Completion = " << statusGloss << endl
        << "--------------------------" << endl;
