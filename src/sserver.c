@@ -69,7 +69,7 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
 
   ClientSet message;
   message.pre.secretKey = htonl(SecretKey);
-  message.pre.msgType = SSERVER_MSG_SET;
+  message.pre.msgType = htons(SSERVER_MSG_SET);
 
   memcpy(&message.varName, variableName, varNameLength + 1);
   message.length = htons(dataLength);
@@ -104,7 +104,7 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
 
   ClientGet message;
   message.pre.secretKey = htonl(SecretKey);
-  message.pre.msgType = SSERVER_MSG_GET;
+  message.pre.msgType = htons(SSERVER_MSG_GET);
   memcpy(&message.varName, variableName, varNameLength + 1);
 
   // Read the response, copy it, and close the connection.
