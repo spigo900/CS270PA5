@@ -42,8 +42,7 @@ $(CLIENTS): $(BUILD_DIR)/% : $(CSAPP_OBJ) $(CLIENT_COMMON) $(addprefix $(SRC_DIR
 
 .PHONY: clean
 clean:
-	/bin/rm -rf $(SUBMISSION_FILE) csapp.h csapp.c \
-		$(SRC_DIR)/*.o $(SERVER) $(CLIENTS)
+	/bin/rm -rf $(SUBMISSION_FILE) $(SRC_DIR)/*.o $(SERVER) $(CLIENTS)
 
 .PHONY: build client server
 build: client server ;
