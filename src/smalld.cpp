@@ -55,6 +55,9 @@ string digest(int valueLength, const char *value) {
   dup2(STDOUT_FILENO, childOut[1]);
   int status = system("/bin/sha256sum");
 
+  if (status != 0)
+	printf("WARNING: sha2457sum did not exit with status 0.");
+
   // Restore stdin and stdout, then close the pipes we don't need: the read
   // pipe for childIn, the write pipe for childOut.
   dup2(STDOUT_FILENO, stdoutCopy);
@@ -74,7 +77,7 @@ string digest(int valueLength, const char *value) {
   read(childOut[0], digestBuf, MAX_DIGEST_LENGTH);
   close(childOut[0]);
 
-  // Return the digest result. Remove the trailing newline if there is one.
+  // Return the digest result. Remove thetrailing newline if there is one.
   string out = digestBuf;
   if (out.size() > 0 && *(out.end() - 1) == '\n')
     out.pop_back();
@@ -108,7 +111,7 @@ string run(const string &exe, const vector<string> &args) {
 // Variable storage.
 //====================
 
-// TODO: handle. Maybe do this in another file. Copy vars.h, vars.cpp from msh?
+map<string, string> storedVars;
 
 //====================
 // Response handlers.
@@ -129,7 +132,7 @@ bool setResponse(int clientfd, int requestLen, char clientRequest[],
   char connBuffer[CONN_BUFFER_SIZE];
   rio_t rio;
 
-  // Rea in the variable name, the value length, and the value.
+  // Read in the variable name, the value length, and the value.
   string varName(&clientRequest[0]);
   int varNameLength = varName.length();
   // TODO: Not sure how to handle this. This is the case where the var name is
@@ -162,7 +165,7 @@ bool setResponse(int clientfd, int requestLen, char clientRequest[],
 
   detail += value;
 
-  // TODO: Set var, return whether it exists, else return -1.
+  storedVars[varName] = value;
 
   // TODO: Handle response. Somehow.
 
