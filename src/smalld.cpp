@@ -29,9 +29,11 @@ ClientPreamble readPreamble(char clientRequest[]) {
   // Read the preamble from the bytes. Don't bother swapping them to host
   // order; we'll do that later.
   ClientPreamble preamble{0, 0};
+  // because sizeof int == 4, this reads exactly what we want
   preamble.secretKey = *(unsigned int *)&clientRequest[0];
+
   preamble.msgType =
-      *(unsigned short *)&clientRequest[sizeof(preamble.secretKey)];
+      *(unsigned short *)&clientRequest[4];
   return preamble;
 }
 
@@ -167,6 +169,8 @@ bool setResponse(int clientfd, int requestLen, char clientRequest[],
 
   storedVars[varName] = value;
 
+  cout << "stored " << value <<  " as " << varName << endl;
+
   // TODO: Handle response. Somehow.
 
   return 0;
@@ -276,12 +280,17 @@ void initHandlers() {
   responseFunctions[SSERVER_MSG_GET] = getResponse;
   responseFunctions[SSERVER_MSG_DIGEST] = digestResponse;
   responseFunctions[SSERVER_MSG_RUN] = runResponse;
+  cout << SSERVER_MSG_SET << "sserver get" << endl;
 };
 
 // Lookup a handler in the handlers table.
 ResponseFunction lookupHandler(MessageType type) {
   auto it = responseFunctions.find(type);
-  ResponseFunction handler = [=](int _clientfd, int _len, char _request[],
+
+  if (it != responseFunctions.end())
+    return it->second;
+
+  return [=](int _clientfd, int _len, char _request[],
                                  string &detail) -> bool {
     detail = "error";
     cerr << "Error: No appropriate handler for message of type `" << type
@@ -289,9 +298,6 @@ ResponseFunction lookupHandler(MessageType type) {
 
     return false;
   };
-  if (it != responseFunctions.end())
-    handler = it->second;
-  return handler;
 }
 
 //=====================
@@ -327,11 +333,15 @@ void handleClient(int connfd, unsigned int secretKey) {
   char clientRequest[MAX_REQUEST_SIZE];
   rio_t rio;
   Rio_readinitb(&rio, connfd);
-  int requestLen = (int)Rio_readlineb(&rio, clientRequest, MAX_REQUEST_SIZE);
+  cout << "reading..." << endl;
+  // only read preamble -- rest will be handled later
+  // as it has variable length
+  int requestLen = (int)Rio_readnb(&rio, clientRequest, 8);
+  cout << "done reading (" << requestLen << ")" << endl;
 
   // TODO: Handle the case where we got a too-short request.
-  if (requestLen < CLIENT_PREAMBLE_SIZE) /* HANDLE */
-    ;
+  if (requestLen < CLIENT_PREAMBLE_SIZE)
+    cout << "WARNING: request too short: " << requestLen << endl;
 
   // Read the preamble and process the info to get the host-order information
   // we need.
@@ -341,7 +351,8 @@ void handleClient(int connfd, unsigned int secretKey) {
 
   // TODO: Do something if the client's secret key isn't right.
   if (theirKey != secretKey) {
-    // STUFF
+	  cout << "Incorrect Key; Access denied." << endl;
+	  exit(1);
   };
 
   // Handle the actual request.
@@ -355,7 +366,7 @@ void handleClient(int connfd, unsigned int secretKey) {
   // Log request information. Could possibly be extracted into another function
   // to make this one shorter, but it's not used anywhere else, so I'm not sure
   // if it's worth it.
-  cerr << "Secret key = " << preamble.secretKey << endl
+  cerr << "Secret key = " << ntohl(preamble.secretKey) << endl
        << "Request type = " << getRequestTypeName(rqType) << endl
        << "Detail = " << detail << endl
        << "Completion = " << statusGloss << endl
@@ -367,6 +378,9 @@ int main(int argc, char *argv[]) {
     cerr << "Usage: " << argv[0] << " [port] [secret key]" << endl;
     exit(1);
   }
+
+  //initialize map of lambdas
+  initHandlers();
 
   // Parse the arguments.
   int port;
@@ -380,15 +394,18 @@ int main(int argc, char *argv[]) {
   initRequestTypeNames();
 
   // BEGIN SHAMELESSLY COPIED CODE
-  int listenfd, connfd;
-  // socklen_t clientlen;
-  // struct sockaddr_in clientaddr;
-
+  int listenfd, connfd, listenPort;
+  sockaddr_in clientAddr;
+  hostent *clientHostEntry;
+  char *clientIP;
+  unsigned short clientPort;
   listenfd = Open_listenfd(port);
+  socklen_t addrLength = sizeof(clientAddr);
+
   while (true) {
     // clientlen = sizeof(clientaddr);
-    // connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-    connfd = Accept(listenfd, NULL, NULL);
+    connfd = Accept(listenfd, (SA *)&clientAddr, &addrLength);
+    cout << "created connfd: " << connfd << endl;
 
     /* Determine the domain name and IP address of the client */
     handleClient(connfd, secretKey);

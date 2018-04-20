@@ -17,6 +17,7 @@
 static void sendMessage(char *machineName, int port, void *message,
                         size_t messageLength, void *response,
                         size_t maxResponseSize) {
+printf("attempting to send a message of length %d\n", messageLength);
   int clientfd;
   rio_t rio;
 
@@ -24,11 +25,14 @@ static void sendMessage(char *machineName, int port, void *message,
   // for errors; Rio does it for us.
   clientfd = Open_clientfd(machineName, port);
   Rio_readinitb(&rio, clientfd);
+  printf("got fd of %d\n", clientfd);
 
   // Write our message, get the response, then clean up.
   Rio_writen(clientfd, message, messageLength);
+  printf("wrote to server...");
   Rio_readnb(&rio, response, maxResponseSize);
   Close(clientfd);
+printf("successfully sent a message of length %d\n", messageLength);
 }
 
 // Set the value of variable `variableName` (a null-terminated string) to value
@@ -91,7 +95,7 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
 
   // Read the response, copy it, and close the connection.
   ServerResponse response;
-  sendMessage(MachineName, port, &message, messageLength, &response,
+  sendMessage(MachineName, port, &message.pre, messageLength, &response,
               sizeof(response));
 
   // Read and return the server's return code.
