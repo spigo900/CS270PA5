@@ -1,6 +1,6 @@
 /*
  * Vars.h - functions for managing (changing + addition + deletion) stored
- * variables in msh
+ * variables in the server
  *
  * author: Owen McGrath
  */
@@ -20,8 +20,7 @@ string lookup(string name,
               function<string(void)> notFound = []() { return ""; });
 
 /*
- * This is never actually used as there is no function to do this in
- * msh core syntax
+ * This is very rarely called
  */
 void deleteByName(string name, function<void(void)> notFoundCallback);
 
@@ -31,4 +30,5 @@ void setVar(string name, string value);
  * I don't think this is ever used
  */
 void forEach(function<void(string, string)>);
+
 } // namespace vars
