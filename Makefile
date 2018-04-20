@@ -11,6 +11,10 @@ SERVER_SOURCES = $(SRC_DIR)/smalld.cpp
 SMALL_CLIENTS = smallSet smallGet smallDigest smallRun
 CLIENTS = $(addprefix $(BUILD_DIR)/, $(SMALL_CLIENTS))
 
+# Compute the source file paths for the clients from the client names. Lots of
+# messy string manipulation stuff. I'm actually not sure we need all of these
+# anymore... I don't think CLIENT_SOURCES is used anywhere. But I don't want to
+# break this, so I'm leaving it as is for now. -JAC
 CLIENT_SOURCES = $(addprefix $(SRC_DIR)/, $(addsuffix ".c", $(SMALL_CLIENTS)))
 CLIENT_SOURCES_COMMON = common.c sserver.c
 CLIENT_COMMON =  $(addprefix $(SRC_DIR)/, $(CLIENT_SOURCES_COMMON:.c=.o))
@@ -18,6 +22,9 @@ CLIENT_COMMON =  $(addprefix $(SRC_DIR)/, $(CLIENT_SOURCES_COMMON:.c=.o))
 COMMON_SRC = $(SRC_DIR)/common.c
 COMMON = $(COMMON_SRC:.c=.o)
 CSAPP = $(INCLUDE_DIR)/csapp.h $(BUILD_DIR)/csapp.c
+
+OUR_HEADERS = $(INCLUDE_DIR)/common.h $(INCLUDE_DIR)/sserver.h
+SUBMISSION_FILE = cs270pa5.tgz
 
 all: $(CSAPP) $(SERVER) $(CLIENTS)
 
@@ -32,17 +39,22 @@ $(CSAPP_OBJ): $(INCLUDE_DIR)/csapp.h $(BUILD_DIR)/csapp.c
 $(SERVER): $(CSAPP_OBJ) $(COMMON) $(SERVER_SOURCES:.cpp=.o)
 	$(CXX) $(SERVER_SOURCES:.cpp=.o) $(COMMON) $(CSAPP_OBJ) $(LDLIBS) -o $(SERVER)
 
-# TODO: fix this fucking thing
-# $(subst $(BUILD_DIR),$(SRC_DIR),%.o)
+# Yay, it works!
 $(CLIENTS): $(BUILD_DIR)/% : $(CSAPP_OBJ) $(CLIENT_COMMON) $(addprefix $(SRC_DIR)/,$(addsuffix .o,%))
 	$(CC) $(subst $(BUILD_DIR),$(SRC_DIR),$(addsuffix .o,$@)) $(CLIENT_COMMON) $(CSAPP_OBJ) $(LDLIBS) -o $@
 
 .PHONY: clean
 clean:
-	/bin/rm -rf csapp.h csapp.c $(SRC_DIR)/*.o $(SERVER) $(CLIENTS)
+	/bin/rm -rf $(SUBMISSION_FILE) csapp.h csapp.c \
+		$(SRC_DIR)/*.o $(SERVER) $(CLIENTS)
 
 .PHONY: build client server
 build: client server ;
 client: $(CLIENTS)
 server: $(SERVER)
+
+# I think this includes everything... not sure.
+submit:
+	tar -czf cs270pa5.tgz README Makefile $(CLIENT_SOURCES) $(SERVER_SOURCES) \
+		$(OUR_HEADERS)
 
