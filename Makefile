@@ -12,10 +12,7 @@ SMALL_CLIENTS = smallSet smallGet smallDigest smallRun
 CLIENTS = $(addprefix $(BUILD_DIR)/, $(SMALL_CLIENTS))
 
 # Compute the source file paths for the clients from the client names. Lots of
-# messy string manipulation stuff. I'm actually not sure we need all of these
-# anymore... I don't think CLIENT_SOURCES is used anywhere. But I don't want to
-# break this, so I'm leaving it as is for now. -JAC
-CLIENT_SOURCES = $(addprefix $(SRC_DIR)/, $(addsuffix ".c", $(SMALL_CLIENTS)))
+# messy string manipulation stuff.
 CLIENT_SOURCES_COMMON = common.c sserver.c
 CLIENT_COMMON =  $(addprefix $(SRC_DIR)/, $(CLIENT_SOURCES_COMMON:.c=.o))
 
