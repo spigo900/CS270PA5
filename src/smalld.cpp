@@ -131,8 +131,15 @@ void initHandlers();
 // client appropriately.
 bool setResponse(int clientfd, int requestLen, char clientRequest[],
                  string &detail) {
+	cout << "CALLING SET RESPONSE" << endl;
   char connBuffer[CONN_BUFFER_SIZE];
   rio_t rio;
+  Rio_readinitb(&rio, clientfd);
+
+  char name[15];
+  cout << "trying to get name: " << endl;
+  int nameLen = (int)Rio_readlineb(&rio, clientRequest, 15);
+  cout << "deteccted name: " << name << endl;
 
   // Read in the variable name, the value length, and the value.
   string varName(&clientRequest[0]);
@@ -359,6 +366,7 @@ void handleClient(int connfd, unsigned int secretKey) {
   ResponseFunction handler = lookupHandler(rqType);
 
   string detail;
+  cout << "CALLING AHANDLER" << endl;
   bool status = handler(connfd, requestLen - CLIENT_PREAMBLE_SIZE,
                         &clientRequest[CLIENT_PREAMBLE_SIZE], detail);
   string statusGloss = status ? "success" : "failure";

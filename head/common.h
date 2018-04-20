@@ -26,7 +26,7 @@
 
 // Size in bytes of the preamble common to every kind of client-to-server
 // message.
-#define CLIENT_PREAMBLE_SIZE 7
+#define CLIENT_PREAMBLE_SIZE 8
 
 // Size in bytes of the common part of every server-to-client message (4 bytes;
 // 1 for the return code and 3 of padding).

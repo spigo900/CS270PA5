@@ -64,7 +64,11 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   // Send our message and get the server's response.
   ServerResponse response;
 
-  sendMessage(MachineName, port, &message, messageLength, &response,
+  printf("SENDING PREAMBLE");
+  sendMessage(MachineName, port, &message.pre, messageLength, &response,
+              sizeof(response));
+  printf("SENDING NAME");
+  sendMessage(MachineName, port, &message.varName, messageLength, &response,
               sizeof(response));
 
   // Read and return the server's return code.
