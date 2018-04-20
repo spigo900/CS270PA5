@@ -46,9 +46,9 @@ recognize the new request type.
 
 ### Variable storage
 The server treats variable contents as an arbitrary sequence of bytes rather
-than as a string. A limitation of the smallSet client is that it always treats
-variable content as a string; this does not affect the sserver library function
-`smallSet()`.
+than as a string. A limitation of the smallSet and smallGet clients is that
+they always treat variable contents as strings; this limitation does not affect
+either of the sserver library functions `smallSet()` or `smallGet()`.
 
 ## Known bugs
 None.
