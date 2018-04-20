@@ -1,0 +1,54 @@
+# CS 270 Project 5, "A small server"
+by Joseph Cecil and Owen McGrath
+
+A small server which responds to various requests, along with a library for
+clients and several clients which serve as thin wrappers around these library
+calls.
+
+
+## Files included
+  - README
+  - Makefile
+  - src/
+      - sserver.c
+      - smallSet.c
+      - smallGet.c
+      - smallDigest.c
+      - smallRun.c
+      - smalld.cpp
+      - common.c
+  - head/
+      - sserver.h
+      - common.h
+
+## Features & limitations
+### sserver interface
+Users of the sserver library code are expected to provide their own buffers for
+sserver to fill. sserver functions taking a result buffer will attempt to fill
+the buffer if they are passed a non-null pointer.
+
+### sserver run requests
+A call to `smallRun()` in the sserver library checks that the run request is a
+valid command before transmitting it. If it is invalid, it does not contact the
+server, instead returning an error code. This means firstly checking that it is
+short enough, and secondly, checking that it is one of the three allowed run
+requests.
+
+This leads to a limitation in that if new commands were to be added on the
+server side, an old client using the `smallRun()` function of sserver would be
+unable to use this new command. Similarly, `smallRun()` would have inconsistent
+behavior when used to contact older servers with a request they do not
+recognize; rather than simply returning -1 it will actually place the request.
+
+However since the server and the client share their validation code,
+recompiling should yield a compatible client and server, both of which
+recognize the new request type.
+
+### Variable storage
+The server treats variable contents as an arbitrary sequence of bytes rather
+than as a string. A limitation of the smallSet and smallGet clients is that
+they always treat variable contents as strings; this limitation does not affect
+either of the sserver library functions `smallSet()` or `smallGet()`.
+
+## Known bugs
+None.

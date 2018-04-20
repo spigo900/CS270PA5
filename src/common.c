@@ -22,7 +22,7 @@ int parseIntWithError(char *toParse, const char *errorMsg) {
 // Using a #define'd constant is not ideal since it could get out of sync with
 // the array, but I'm not sure if there's a better solution.
 #define VALID_RUN_REQUESTS 3
-static const char *validRunRequests[] = {"inet", "hosts", "services"};
+static const char *validRunRequests[] = {"inet", "hosts", "service"};
 
 // Check whether the given request string is valid (i.e. is one of 'inet',
 // 'hosts', or 'services' and is shorter than MAX_RUNREQ_LENGTH).
