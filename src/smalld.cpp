@@ -147,6 +147,7 @@ bool setResponse(int clientfd, rio_t rio, string &detail) {
   Rio_readnb(&rio, &value[0], valueLength);
 
   for (char valChar : value) { detail += valChar; }
+  detail += '\0';
 
   // Store the value and print a debug message about it.
   storedVars[varName] = value;
