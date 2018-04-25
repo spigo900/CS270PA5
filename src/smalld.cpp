@@ -39,6 +39,7 @@ ClientPreamble readPreamble(char clientRequest[]) {
   // Read the preamble from the bytes. Don't bother swapping them to host
   // order; we'll do that later.
   ClientPreamble preamble{0, 0};
+
   // because sizeof int == 4, this reads exactly what we want
   preamble.secretKey = *(unsigned int *)&clientRequest[0];
 
@@ -63,17 +64,19 @@ string digest(int valueLength, const char *value) {
   pipe(childOut);
 
   // Overwrite stdin and stdout with pipes.
+  cerr << "DOING SHA256SUM" << endl;
   dup2(STDIN_FILENO, childIn[0]);
   dup2(STDOUT_FILENO, childOut[1]);
-  int status = system("/bin/sha256sum");
+  int status = system("/usr/bin/sha256sum");
 
+  // Check status code.
   if (status != 0)
-	printf("WARNING: sha2457sum did not exit with status 0.");
+    printf("WARNING: sha256sum did not exit with status 0.");
 
   // Restore stdin and stdout, then close the pipes we don't need: the read
   // pipe for childIn, the write pipe for childOut.
-  dup2(STDOUT_FILENO, stdoutCopy);
   dup2(STDIN_FILENO, stdinCopy);
+  dup2(STDOUT_FILENO, stdoutCopy);
   close(childIn[0]);
   close(childOut[1]);
 
@@ -89,7 +92,7 @@ string digest(int valueLength, const char *value) {
   read(childOut[0], digestBuf, MAX_DIGEST_LENGTH);
   close(childOut[0]);
 
-  // Return the digest result. Remove thetrailing newline if there is one.
+  // Return the digest result. Remove the trailing newline if there is one.
   string out = digestBuf;
   if (out.size() > 0 && *(out.end() - 1) == '\n')
     out.pop_back();
@@ -97,27 +100,26 @@ string digest(int valueLength, const char *value) {
 }
 
 // Run a child program, capturing and returning its stdout.
-/*
-string run(const string &exe, const vector<string> &args) {
-  int stdout = dup(STDOUT_FILENO);
-
-  int pipes[2];
-  pipe(pipes);
-  int writePipe = pipes[0];
-  int readPipe = pipes[1];
-  dup2(STDIN_FILENO, writePipe);
-
+string run(const string &exe, const std::vector<string> &args) {
+  string out;
   string cmd = exe;
   for (const string& arg : args) {
+    // Single-quote the argument strings to make sure they get broken up
+    // correctly.
     cmd += " '";
     cmd += arg;
     cmd += "'";
   }
 
-  system(cmd.c_string());
-  close(pipes[0])
+  // Execute the command and read its output, then return it.
+  FILE* cmdOutput = popen(cmd.c_str(), "r");
+
+  char buffer[MAX_SERVER_DATA_LENGTH];
+  fread(&buffer[0], sizeof(char), 1, cmdOutput);
+  out = buffer;
+
+  return out;
 }
-*/
 
 //====================
 // Variable storage.
@@ -236,7 +238,30 @@ bool getResponse(int clientfd, rio_t rio, string &detail) {
 // Digest response handler. Should process the input appropriately and return
 // the digest to the client.
 bool digestResponse(int clientfd, rio_t rio, string &detail) {
-  // TODO: write.
+  // Read in the value length.
+  unsigned short valueLength;
+  Rio_readnb(&rio, &valueLength, sizeof(valueLength));
+  valueLength = ntohs(valueLength);
+
+  // Verify that we got fewer than max characters; fail if not.
+  if (valueLength > MAX_DIGEST_LENGTH) {
+    fail(clientfd);
+    return false;
+  }
+
+  // Read in the actual value.
+  char value[MAX_DIGEST_LENGTH];
+  Rio_readnb(&rio, &value[0], valueLength);
+
+  // Digest it.
+  string digested = digest((int) valueLength, (const char*) &value[0]);
+
+  // Respond.
+  ServerResponse response;
+  response.status = 0;
+  response.length = htons((unsigned short) digested.size());
+  std::copy(&value[0], &value[MAX_DIGEST_LENGTH], &response.data[0]);
+  Rio_writen(clientfd, &response, sizeof(response));
 
   return false;
 }
@@ -244,8 +269,8 @@ bool digestResponse(int clientfd, rio_t rio, string &detail) {
 // Handler for a run response. Should check that the request is valid, and if
 // so, run the appropriate program and return the result to the client.
 bool runResponse(int clientfd, rio_t rio, string &detail) {
-  char connBuffer[CONN_BUFFER_SIZE];
-  // rio_t rio;
+  char name[MAX_VARNAME_LENGTH + 1];
+  Rio_readnb(&rio, &name[0], MAX_VARNAME_LENGTH + 1);
 
   string varName;
   varName.reserve(MAX_VARNAME_LENGTH + 1);
