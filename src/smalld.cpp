@@ -77,7 +77,7 @@ string run(const string &exe) {
 
   char buffer[MAX_SERVER_DATA_LENGTH];
   fread(&buffer[0], sizeof(char), MAX_SERVER_DATA_LENGTH, cmdOutput);
-  int st = pclose(cmdOutput);
+  pclose(cmdOutput);
   out = buffer;
 
   return out;
@@ -212,6 +212,8 @@ bool digestResponse(int clientfd, rio_t rio, string &detail) {
   // Read in the actual value.
   char value[MAX_DIGEST_LENGTH];
   Rio_readnb(&rio, &value[0], valueLength);
+
+  detail += value;
 
   // Digest it.
   string digested = digest((int) valueLength, (const char*) &value[0]);
