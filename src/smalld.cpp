@@ -69,7 +69,6 @@ string digest(int valueLength, const char *value) {
 
 // Run a child program, capturing and returning its stdout.
 string run(const string &exe) {
-  cerr << "CMD IS " << exe << endl;
   string out;
   string cmd = exe;
 
@@ -79,9 +78,7 @@ string run(const string &exe) {
   char buffer[MAX_SERVER_DATA_LENGTH];
   fread(&buffer[0], sizeof(char), MAX_SERVER_DATA_LENGTH, cmdOutput);
   int st = pclose(cmdOutput);
-  cerr << "STATUS WAS " << st << endl;
   out = buffer;
-  cerr << "CHECK MY OUT: " << out << endl;
 
   return out;
 }
@@ -153,8 +150,6 @@ bool setResponse(int clientfd, rio_t rio, string &detail) {
 
   // Store the value and print a debug message about it.
   storedVars[varName] = value;
-
-  cerr << "stored " << value <<  " as " << varName << endl;
 
   ServerResponse response;
   response.status = 0;
@@ -271,7 +266,6 @@ void initHandlers() {
   responseFunctions[SSERVER_MSG_GET] = getResponse;
   responseFunctions[SSERVER_MSG_DIGEST] = digestResponse;
   responseFunctions[SSERVER_MSG_RUN] = runResponse;
-  cout << SSERVER_MSG_SET << "sserver get" << endl;
 };
 
 // Lookup a handler in the handlers table.
@@ -323,16 +317,14 @@ void handleClient(int connfd, unsigned int secretKey) {
   char clientRequest[MAX_REQUEST_SIZE];
   rio_t rio;
   Rio_readinitb(&rio, connfd);
-  cout << "reading..." << endl;
 
   // Only read preamble. Since the actual request may vary in size, read that
   // in the handler functions.
   int requestLen = (int)Rio_readnb(&rio, clientRequest, CLIENT_PREAMBLE_SIZE);
-  cout << "done reading (" << requestLen << ")" << endl;
 
   // TODO: Handle the case where we got a too-short request.
   if (requestLen < CLIENT_PREAMBLE_SIZE)
-    cout << "WARNING: request too short: " << requestLen << endl;
+    cerr << "WARNING: request too short: " << requestLen << endl;
 
   // Read the preamble and process the info to get the host-order information
   // we need.
@@ -342,7 +334,7 @@ void handleClient(int connfd, unsigned int secretKey) {
 
   // TODO: Do something if the client's secret key isn't right.
   if (theirKey != secretKey) {
-	  cout << "Incorrect Key; Access denied." << endl;
+	  cerr << "Incorrect Key; Access denied." << endl;
 	  exit(1);
   };
 
@@ -350,7 +342,6 @@ void handleClient(int connfd, unsigned int secretKey) {
   ResponseFunction handler = lookupHandler(rqType);
 
   string detail;
-  cout << "CALLING AHANDLER" << endl;
   bool status = handler(connfd, rio, detail);
   string statusGloss = status ? "success" : "failure";
 
@@ -393,7 +384,6 @@ int main(int argc, char *argv[]) {
     // We don't care about the client's address, so don't get it. Just get a
     // connection file descriptor.
     connfd = Accept(listenfd, NULL, NULL);
-    cout << "created connfd: " << connfd << endl;
 
     /* Determine the domain name and IP address of the client */
     handleClient(connfd, secretKey);
