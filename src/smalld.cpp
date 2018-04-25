@@ -50,50 +50,17 @@ ClientPreamble readPreamble(char clientRequest[]) {
 
 // Get the digest value of the value using /bin/sha256sum.
 string digest(int valueLength, const char *value) {
-  // Set up pipes.
-  int stdinCopy = dup(STDIN_FILENO);
-  int stdoutCopy = dup(STDOUT_FILENO);
+  const char cmdTemplate[] = "echo '%100s' | /usr/bin/sha256sum";
+  const size_t CMD_BUFFER_SIZE = 400;
+  char cmd[CMD_BUFFER_SIZE];
+  snprintf(cmd, CMD_BUFFER_SIZE, cmdTemplate, value);
 
-  // Make two pipes: One (`childIn`) we'll use to send `value` to sha256sum;
-  // another (`childOut`) that we'll use to read the digest.
-  //
-  // NOTE: According to man 2 pipe2, [0] is the read end, [1] is write end.
-  int childIn[2];
-  int childOut[2];
-  pipe(childIn);
-  pipe(childOut);
-
-  // Overwrite stdin and stdout with pipes.
-  cerr << "DOING SHA256SUM" << endl;
-  dup2(STDIN_FILENO, childIn[0]);
-  dup2(STDOUT_FILENO, childOut[1]);
-  int status = system("/usr/bin/sha256sum");
-
-  // Check status code.
-  if (status != 0)
-    printf("WARNING: sha256sum did not exit with status 0.");
-
-  // Restore stdin and stdout, then close the pipes we don't need: the read
-  // pipe for childIn, the write pipe for childOut.
-  dup2(STDIN_FILENO, stdinCopy);
-  dup2(STDOUT_FILENO, stdoutCopy);
-  close(childIn[0]);
-  close(childOut[1]);
-
-  // Send the value to be digested.
-  write(childIn[1], value, valueLength);
-  close(childIn[1]);
-
-  // Read the digest and close the read pipe.
-  const int FUDGE_AMT = 20;
-  char digestBuf[MAX_DIGEST_LENGTH + 1 + FUDGE_AMT];
-  digestBuf[MAX_DIGEST_LENGTH] = '\0';
-
-  read(childOut[0], digestBuf, MAX_DIGEST_LENGTH);
-  close(childOut[0]);
+  FILE* pipe = popen(cmd, "r");
+  char digested[MAX_SERVER_DATA_LENGTH];
+  fread(&digested[0], sizeof(char), MAX_SERVER_DATA_LENGTH, pipe);
 
   // Return the digest result. Remove the trailing newline if there is one.
-  string out = digestBuf;
+  string out = digested;
   if (out.size() > 0 && *(out.end() - 1) == '\n')
     out.pop_back();
   return out;
@@ -260,10 +227,10 @@ bool digestResponse(int clientfd, rio_t rio, string &detail) {
   ServerResponse response;
   response.status = 0;
   response.length = htons((unsigned short) digested.size());
-  std::copy(&value[0], &value[MAX_DIGEST_LENGTH], &response.data[0]);
+  std::copy(digested.begin(), digested.end(), &response.data[0]);
   Rio_writen(clientfd, &response, sizeof(response));
 
-  return false;
+  return true;
 }
 
 // Handler for a run response. Should check that the request is valid, and if
