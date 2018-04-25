@@ -73,7 +73,7 @@ typedef struct {
   char status;
   char junk[3];
   unsigned short length;
-  char data[MAX_SERVER_DATA_LENGTH];
+  char data[MAX_SERVER_DATA_LENGTH + 1];
 } ServerResponse;
 
 int parseIntWithError(char *toParse, const char *errorMsg);

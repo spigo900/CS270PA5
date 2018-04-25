@@ -58,6 +58,7 @@ string digest(int valueLength, const char *value) {
   FILE* pipe = popen(cmd, "r");
   char digested[MAX_SERVER_DATA_LENGTH];
   fread(&digested[0], sizeof(char), MAX_SERVER_DATA_LENGTH, pipe);
+  pclose(pipe);
 
   // Return the digest result. Remove the trailing newline if there is one.
   string out = digested;
@@ -67,23 +68,20 @@ string digest(int valueLength, const char *value) {
 }
 
 // Run a child program, capturing and returning its stdout.
-string run(const string &exe, const std::vector<string> &args) {
+string run(const string &exe) {
+  cerr << "CMD IS " << exe << endl;
   string out;
   string cmd = exe;
-  for (const string& arg : args) {
-    // Single-quote the argument strings to make sure they get broken up
-    // correctly.
-    cmd += " '";
-    cmd += arg;
-    cmd += "'";
-  }
 
   // Execute the command and read its output, then return it.
   FILE* cmdOutput = popen(cmd.c_str(), "r");
 
   char buffer[MAX_SERVER_DATA_LENGTH];
-  fread(&buffer[0], sizeof(char), 1, cmdOutput);
+  fread(&buffer[0], sizeof(char), MAX_SERVER_DATA_LENGTH, cmdOutput);
+  int st = pclose(cmdOutput);
+  cerr << "STATUS WAS " << st << endl;
   out = buffer;
+  cerr << "CHECK MY OUT: " << out << endl;
 
   return out;
 }
@@ -236,17 +234,35 @@ bool digestResponse(int clientfd, rio_t rio, string &detail) {
 // Handler for a run response. Should check that the request is valid, and if
 // so, run the appropriate program and return the result to the client.
 bool runResponse(int clientfd, rio_t rio, string &detail) {
-  char name[MAX_VARNAME_LENGTH + 1];
-  Rio_readnb(&rio, &name[0], MAX_VARNAME_LENGTH + 1);
+  char name[MAX_RUNREQ_LENGTH];
+  Rio_readnb(&rio, &name[0], MAX_RUNREQ_LENGTH);
 
-  string varName;
-  varName.reserve(MAX_VARNAME_LENGTH + 1);
-  int varNameLength = varName.length();
-  detail = varName;
+  string realName(name);
 
-  // TODO: Handle.
+  string output;
+  if (realName == "inet") {
+    output = run("/sbin/ifconfig -a");
+  } else if (realName == "hosts") {
+    output = run("/bin/cat /etc/hosts");
+  } else if (realName == "service") {
+    output = run("/bin/cat /etc/services");
+  } else {
+    fail(clientfd);
+    return false;
+  }
 
-  return 0;
+  ServerResponse response;
+  response.status = 0;
+  response.length = htons((unsigned short) output.size());
+  if (output.size() > MAX_SERVER_DATA_LENGTH) {
+    std::copy(output.begin(), output.begin() + MAX_SERVER_DATA_LENGTH, &response.data[0]);
+    response.data[MAX_SERVER_DATA_LENGTH] = '\0';
+  } else {
+    std::copy(output.begin(), output.end(), &response.data[0]);
+  }
+  Rio_writen(clientfd, &response, sizeof(response));
+
+  return true;
 }
 
 // Setup the handlers table.
