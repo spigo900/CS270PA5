@@ -199,13 +199,13 @@ bool setResponse(int clientfd, rio_t rio, string &detail) {
 // Handler for a get response. Should get the variable and return it to the
 // client appropriately.
 bool getResponse(int clientfd, rio_t rio, string &detail) {
-  char connBuffer[CONN_BUFFER_SIZE];
-  // rio_t rio;
+  char name[MAX_VARNAME_LENGTH + 1];
+  Rio_readnb(&rio, &name[0], MAX_VARNAME_LENGTH + 1);
 
-  // Read the var name requested in as varName. Set the detail string
-  // appropriately.
-  string varName;
+  // Read in the variable name.
+  string varName(name);
   int varNameLength = varName.length();
+
   detail = varName;
 
   // If it's not a valid variable name, reject.
