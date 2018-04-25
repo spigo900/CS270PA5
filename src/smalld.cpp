@@ -38,24 +38,30 @@ ClientPreamble readPreamble(char clientRequest[]) {
 }
 
 // Get the digest value of the value using /bin/sha256sum.
-string digest(int valueLength, const char *value) {
-  // Set up pipes.
-  int stdinCopy = dup(STDIN_FILENO);
+const char * digest(int valueLength, const char *value) {
+  string command = string("echo ") + value + " | /bin/sha256sum";
+	FILE *f = popen(command.c_str(), "r");
+char buf[100];
+while (fgets(buf, sizeof(buf), f) != 0) {
+}
+pclose(f);
+char *fin = (char *)malloc(100);
+memcpy(buf, fin, 100);
+return fin;
+/*  // Set up pipes.
   int stdoutCopy = dup(STDOUT_FILENO);
 
   // Make two pipes: One (`childIn`) we'll use to send `value` to sha256sum;
   // another (`childOut`) that we'll use to read the digest.
   //
   // NOTE: According to man 2 pipe2, [0] is the read end, [1] is write end.
-  int childIn[2];
   int childOut[2];
-  pipe(childIn);
   pipe(childOut);
 
   // Overwrite stdin and stdout with pipes.
-  dup2(STDIN_FILENO, childIn[0]);
   dup2(STDOUT_FILENO, childOut[1]);
-  int status = system("/bin/sha256sum");
+
+  int status = system(command.c_str());
 
   if (status != 0)
 	printf("WARNING: sha2457sum did not exit with status 0.");
@@ -63,13 +69,9 @@ string digest(int valueLength, const char *value) {
   // Restore stdin and stdout, then close the pipes we don't need: the read
   // pipe for childIn, the write pipe for childOut.
   dup2(STDOUT_FILENO, stdoutCopy);
-  dup2(STDIN_FILENO, stdinCopy);
-  close(childIn[0]);
   close(childOut[1]);
 
   // Send the value to be digested.
-  write(childIn[1], value, valueLength);
-  close(childIn[1]);
 
   // Read the digest and close the read pipe.
   const int FUDGE_AMT = 20;
@@ -83,7 +85,7 @@ string digest(int valueLength, const char *value) {
   string out = digestBuf;
   if (out.size() > 0 && *(out.end() - 1) == '\n')
     out.pop_back();
-  return out;
+  return out;*/
 }
 
 // Run a child program, capturing and returning its stdout.
@@ -401,6 +403,27 @@ void handleClient(int connfd, unsigned int secretKey) {
 			responselen = storedVars[name].length();
 		}
 
+	}
+	else if (rqType == 2) //digest type
+	{
+		short n;
+		Rio_readnb(&rio, (void*)&n, 2);
+		cout << "n: " << n << endl;
+
+		if (n > 100)
+		{
+			cerr << "message cannot be >100 chars long" << endl;
+		}
+		else
+		{
+			char *str = (char *)malloc(n);
+			cout << "reading..." << endl;
+			Rio_readnb(&rio, str, n);
+			cout << "read " << str << endl;
+			response = const_cast<char*>(digest(n, str));
+			responselen = n;
+			cout << str << " -> " << response << endl;
+		}
 	}
 
 	cout << "response: " << response << endl;

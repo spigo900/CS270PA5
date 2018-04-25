@@ -182,8 +182,17 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
 
   // Read the response, copy it, and close the connection.
   ServerResponse response;
-  sendMessage(MachineName, port, &message, messageLength, &response,
-              sizeof(response));
+ int clientfd;
+  rio_t rio;
+
+  // Open a connection and set up the Rio type thing. We don't need to check
+  // for errors; Rio does it for us.
+  clientfd = Open_clientfd(MachineName, port);
+  Rio_readinitb(&rio, clientfd);
+
+  Rio_writen(clientfd, &message.pre, 8);
+  Rio_writen(clientfd, (void *)&dataLength, 2);
+	Rio_writen(clientfd, data, dataLength);
 
   // Read and return the server's return code.
   int returnCode = (int)response.status;
