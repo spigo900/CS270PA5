@@ -146,22 +146,23 @@ void fail(int clientfd) {
 // Handler for a set response. Should set the variable and respond to the
 // client appropriately.
 bool setResponse(int clientfd, rio_t rio, string &detail) {
-	cout << "CALLING SET RESPONSE" << endl;
-  char connBuffer[CONN_BUFFER_SIZE];
-  // rio_t rio;
-  // Rio_readinitb(&rio, clientfd);
-
   char name[MAX_VARNAME_LENGTH + 1];
-  cout << "trying to get name: " << endl;
-  int nameLen = (int)Rio_readnb(&rio, &name[0], MAX_VARNAME_LENGTH + 1);
-  cout << "deteccted name: " << name << endl;
+  Rio_readnb(&rio, &name[0], MAX_VARNAME_LENGTH + 1);
 
-  // Read in the variable name, the value length, and the value.
+  // Read in the variable name and calculate its length.
   string varName(name);
   int varNameLength = varName.length();
-  // TODO: Not sure how to handle this. This is the case where the var name is
 
+  // Set the detail string.
   detail = varName;
+
+  // Check the value's length.
+  if (varNameLength > MAX_VARNAME_LENGTH) {
+    fail(clientfd);
+    return false;
+  }
+
+  // Add a colon before the value.
   detail += ": ";
 
   unsigned short valueLength;
@@ -177,14 +178,16 @@ bool setResponse(int clientfd, rio_t rio, string &detail) {
     return false;
   }
 
+  // Read the value, and add it to the detail string.
   ValueT value;
   Rio_readnb(&rio, &value[0], valueLength);
 
   for (char valChar : value) { detail += valChar; }
 
+  // Store the value and print a debug message about it.
   storedVars[varName] = value;
 
-  cout << "stored " << value <<  " as " << varName << endl;
+  cerr << "stored " << value <<  " as " << varName << endl;
 
   ServerResponse response;
   response.status = 0;
