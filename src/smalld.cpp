@@ -18,11 +18,21 @@ using std::endl;
 
 // The size of a connection buffer, used to hold the server's response when
 // responding to a client's request.
-const size_t CONN_BUFFER_SIZE = 200;
+const size_t CONN_BUFFER_SIZE = 400;
+
+using ValueT = std::array<char, MAX_VALUE_LENGTH>;
 
 //===================
 // Helper functions.
 //===================
+
+// Helper that lets us print a value using the << operator on streams.
+std::ostream& operator<<(std::ostream& out, ValueT val) {
+  for (char valChar : val) {
+    out << valChar;
+  }
+  return out;
+}
 
 // Read the preamble of a client's request into a struct.
 ClientPreamble readPreamble(char clientRequest[]) {
@@ -113,7 +123,7 @@ string run(const string &exe, const vector<string> &args) {
 // Variable storage.
 //====================
 
-map<string, string> storedVars;
+map<string, ValueT> storedVars;
 
 //====================
 // Response handlers.
@@ -123,158 +133,121 @@ map<string, string> storedVars;
 // file descriptor, the number of bytes in the client's request, the bytes of
 // the request (not including the preamble), and a reference to the "detail"
 // string), and return whether or not it succeeded in responding to the client.
-using ResponseFunction = std::function<bool(int, int, char[], string &)>;
+using ResponseFunction = std::function<bool(int, rio_t, string &)>;
 map<MessageType, ResponseFunction> responseFunctions;
 void initHandlers();
 
+void fail(int clientfd) {
+  ServerResponse response;
+  response.status = -1;
+  Rio_writen(clientfd, &response, sizeof(response));
+}
+
 // Handler for a set response. Should set the variable and respond to the
 // client appropriately.
-bool setResponse(int clientfd, int requestLen, char clientRequest[],
-                 string &detail) {
+bool setResponse(int clientfd, rio_t rio, string &detail) {
 	cout << "CALLING SET RESPONSE" << endl;
   char connBuffer[CONN_BUFFER_SIZE];
-  rio_t rio;
-  Rio_readinitb(&rio, clientfd);
+  // rio_t rio;
+  // Rio_readinitb(&rio, clientfd);
 
-  char name[15];
+  char name[MAX_VARNAME_LENGTH + 1];
   cout << "trying to get name: " << endl;
-  int nameLen = (int)Rio_readlineb(&rio, clientRequest, 15);
+  int nameLen = (int)Rio_readnb(&rio, &name[0], MAX_VARNAME_LENGTH + 1);
   cout << "deteccted name: " << name << endl;
 
   // Read in the variable name, the value length, and the value.
-  string varName(&clientRequest[0]);
+  string varName(name);
   int varNameLength = varName.length();
   // TODO: Not sure how to handle this. This is the case where the var name is
-  if (varNameLength >= (requestLen - LENGTH_SPECIFIER_SIZE))
-    return -1;
-  if (varNameLength >= requestLen)
-    return -1;
 
   detail = varName;
   detail += ": ";
 
   unsigned short valueLength;
-  valueLength = ((unsigned short)clientRequest[varNameLength + 1]) << 8;
-  valueLength |= (unsigned short)clientRequest[varNameLength + 2];
+  Rio_readnb(&rio, &valueLength, sizeof(valueLength));
+  valueLength = ntohs(valueLength);
 
   // Check the value's length.
   if (valueLength > MAX_VALUE_LENGTH) {
     detail += "(value length field too large, at ";
     detail += valueLength;
-    detail += +" bytes)";
-    return -1;
+    detail += " bytes)";
+    fail(clientfd);
+    return false;
   }
 
-  char *value = (char *)malloc(valueLength + 1);
-  std::copy(&clientRequest[varNameLength + LENGTH_SPECIFIER_SIZE +
-                           1], // +1 for the trailing null
-            &clientRequest[varNameLength + LENGTH_SPECIFIER_SIZE +
-                           valueLength], // do I need a +1 here?
-            value);
+  ValueT value;
+  Rio_readnb(&rio, &value[0], valueLength);
 
-  detail += value;
+  for (char valChar : value) { detail += valChar; }
 
   storedVars[varName] = value;
 
   cout << "stored " << value <<  " as " << varName << endl;
 
-  // TODO: Handle response. Somehow.
+  ServerResponse response;
+  response.status = 0;
+  Rio_writen(clientfd, &response, sizeof(response));
 
-  return 0;
+  return true;
 }
 
 // Handler for a get response. Should get the variable and return it to the
 // client appropriately.
-bool getResponse(int clientfd, int requestLen, char clientRequest[],
-                 string &detail) {
+bool getResponse(int clientfd, rio_t rio, string &detail) {
   char connBuffer[CONN_BUFFER_SIZE];
-  rio_t rio;
+  // rio_t rio;
 
-  string varName(&clientRequest[0]);
+  // Read the var name requested in as varName. Set the detail string
+  // appropriately.
+  string varName;
   int varNameLength = varName.length();
   detail = varName;
-  if (varNameLength >= requestLen)
-    return -1;
 
-  // TODO: Lookup var, return it if it exists, else return -1.
+  // If it's not a valid variable name, reject.
+  if (varNameLength > MAX_VARNAME_LENGTH) {
+    fail(clientfd);
+    return false;
+  };
 
-  return 0;
+  // Lookup var. Fail if it doesn't exist.
+  auto it = storedVars.find(varName);
+  if (it == storedVars.end()) {
+    fail(clientfd);
+    return false;
+  }
+
+  // Get the value and respond.
+  ValueT value = it->second;
+
+  ServerResponse response;
+  response.status = 0;
+  response.length = htons((unsigned short) value.size());
+  std::copy(value.begin(), value.end(), &response.data[0]);
+  Rio_writen(clientfd, &response, sizeof(response));
+
+  return true;
 }
 
 // Digest response handler. Should process the input appropriately and return
 // the digest to the client.
-bool digestResponse(int clientfd, int requestLen, char clientRequest[],
-                    string &detail) {
-  int result = 0;
+bool digestResponse(int clientfd, rio_t rio, string &detail) {
+  // TODO: write.
 
-  // Read in the value length in network order.
-  unsigned short valueLength;
-  valueLength = ((unsigned short)clientRequest[0]) << 8;
-  valueLength |= (unsigned short)clientRequest[1];
-
-  // If the value's length is out of range,
-  if (valueLength > MAX_VARNAME_LENGTH) {
-    result = -1;
-  }
-
-  // Make sure we actually got the expected number of bytes.
-  if (valueLength >= (requestLen - LENGTH_SPECIFIER_SIZE))
-    result = -1;
-
-  // Grab the value and copy it into the detail string.
-  char *value = &clientRequest[LENGTH_SPECIFIER_SIZE];
-  detail = value;
-
-  // Maximum length of a command.
-  /*
-  const int MAX_COMMAND_LENGTH = 60 + MAX_VALUE_LENGTH;
-  // NOTE: Is snprintf a security vulnerability here?
-  char command[MAX_COMMAND_LENGTH];
-  snprintf(command, MAX_COMMAND_LENGTH, "/bin/echo '%100s' | /bin/sha256sum",
-  value);
-
-  // Copy the value.
-  //
-  // TODO: I might not need this.
-  char *value = (char *)malloc(valueLength + 1);
-  std::copy(&clientRequest[LENGTH_SPECIFIER_SIZE],
-            &clientRequest[LENGTH_SPECIFIER_SIZE + valueLength - 1],
-            value);
-  */
-
-  // Get the digest.
-  string out = digest(valueLength, value);
-
-  char connBuffer[CONN_BUFFER_SIZE];
-  connBuffer[0] = (char)result;
-
-  // The length of out, including the final null.
-  int outLengthNull = out.length() + 1;
-  std::copy(out.begin(),
-            out.begin() + (outLengthNull > MAX_DIGEST_LENGTH ? MAX_DIGEST_LENGTH
-                                                             : outLengthNull),
-            &connBuffer[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE]);
-  connBuffer[SERVER_PREAMBLE_SIZE + LENGTH_SPECIFIER_SIZE + outLengthNull] =
-      '\0';
-
-  // Write out the response.
-  Rio_writen(clientfd, connBuffer, outLengthNull);
-
-  return 0;
+  return false;
 }
 
 // Handler for a run response. Should check that the request is valid, and if
 // so, run the appropriate program and return the result to the client.
-bool runResponse(int clientfd, int requestLen, char clientRequest[],
-                 string &detail) {
+bool runResponse(int clientfd, rio_t rio, string &detail) {
   char connBuffer[CONN_BUFFER_SIZE];
-  rio_t rio;
+  // rio_t rio;
 
-  string varName(&clientRequest[0]);
+  string varName;
+  varName.reserve(MAX_VARNAME_LENGTH + 1);
   int varNameLength = varName.length();
   detail = varName;
-  if (varNameLength >= requestLen)
-    return -1;
 
   // TODO: Handle.
 
@@ -297,8 +270,7 @@ ResponseFunction lookupHandler(MessageType type) {
   if (it != responseFunctions.end())
     return it->second;
 
-  return [=](int _clientfd, int _len, char _request[],
-                                 string &detail) -> bool {
+  return [=](int _clientfd, rio_t _rio, string &detail) -> bool {
     detail = "error";
     cerr << "Error: No appropriate handler for message of type `" << type
          << "`." << endl;
@@ -341,9 +313,10 @@ void handleClient(int connfd, unsigned int secretKey) {
   rio_t rio;
   Rio_readinitb(&rio, connfd);
   cout << "reading..." << endl;
-  // only read preamble -- rest will be handled later
-  // as it has variable length
-  int requestLen = (int)Rio_readnb(&rio, clientRequest, 8);
+
+  // Only read preamble. Since the actual request may vary in size, read that
+  // in the handler functions.
+  int requestLen = (int)Rio_readnb(&rio, clientRequest, CLIENT_PREAMBLE_SIZE);
   cout << "done reading (" << requestLen << ")" << endl;
 
   // TODO: Handle the case where we got a too-short request.
@@ -367,8 +340,7 @@ void handleClient(int connfd, unsigned int secretKey) {
 
   string detail;
   cout << "CALLING AHANDLER" << endl;
-  bool status = handler(connfd, requestLen - CLIENT_PREAMBLE_SIZE,
-                        &clientRequest[CLIENT_PREAMBLE_SIZE], detail);
+  bool status = handler(connfd, rio, detail);
   string statusGloss = status ? "success" : "failure";
 
   // Log request information. Could possibly be extracted into another function

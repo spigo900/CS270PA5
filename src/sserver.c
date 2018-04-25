@@ -17,7 +17,6 @@
 static void sendMessage(char *machineName, int port, void *message,
                         size_t messageLength, void *response,
                         size_t maxResponseSize) {
-printf("attempting to send a message of length %d\n", messageLength);
   int clientfd;
   rio_t rio;
 
@@ -25,14 +24,11 @@ printf("attempting to send a message of length %d\n", messageLength);
   // for errors; Rio does it for us.
   clientfd = Open_clientfd(machineName, port);
   Rio_readinitb(&rio, clientfd);
-  printf("got fd of %d\n", clientfd);
 
   // Write our message, get the response, then clean up.
   Rio_writen(clientfd, message, messageLength);
-  printf("wrote to server...");
   Rio_readnb(&rio, response, maxResponseSize);
   Close(clientfd);
-printf("successfully sent a message of length %d\n", messageLength);
 }
 
 // Set the value of variable `variableName` (a null-terminated string) to value
@@ -64,11 +60,7 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   // Send our message and get the server's response.
   ServerResponse response;
 
-  printf("SENDING PREAMBLE");
-  sendMessage(MachineName, port, &message.pre, messageLength, &response,
-              sizeof(response));
-  printf("SENDING NAME");
-  sendMessage(MachineName, port, &message.varName, messageLength, &response,
+  sendMessage(MachineName, port, &message, messageLength, &response,
               sizeof(response));
 
   // Read and return the server's return code.
@@ -99,7 +91,7 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
 
   // Read the response, copy it, and close the connection.
   ServerResponse response;
-  sendMessage(MachineName, port, &message.pre, messageLength, &response,
+  sendMessage(MachineName, port, &message, messageLength, &response,
               sizeof(response));
 
   // Read and return the server's return code.
