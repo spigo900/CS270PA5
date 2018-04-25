@@ -387,7 +387,7 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  //initialize map of lambdas
+  // Initialize request handler map.
   initHandlers();
 
   // Parse the arguments.
@@ -402,17 +402,14 @@ int main(int argc, char *argv[]) {
   initRequestTypeNames();
 
   // BEGIN SHAMELESSLY COPIED CODE
-  int listenfd, connfd, listenPort;
-  sockaddr_in clientAddr;
-  hostent *clientHostEntry;
-  char *clientIP;
-  unsigned short clientPort;
+  int listenfd, connfd;
   listenfd = Open_listenfd(port);
-  socklen_t addrLength = sizeof(clientAddr);
 
   while (true) {
-    // clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientAddr, &addrLength);
+    // connfd = Accept(listenfd, (SA *)&clientAddr, &addrLength);
+    // We don't care about the client's address, so don't get it. Just get a
+    // connection file descriptor.
+    connfd = Accept(listenfd, NULL, NULL);
     cout << "created connfd: " << connfd << endl;
 
     /* Determine the domain name and IP address of the client */
