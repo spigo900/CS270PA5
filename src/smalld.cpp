@@ -131,15 +131,14 @@ void initHandlers();
 // client appropriately.
 bool setResponse(int clientfd, int requestLen, char clientRequest[],
                  string &detail) {
-	cout << "CALLING SET RESPONSE" << endl;
   char connBuffer[CONN_BUFFER_SIZE];
   rio_t rio;
-  Rio_readinitb(&rio, clientfd);
+ Rio_readinitb(&rio, clientfd);
 
-  char name[15];
+  char *name = (char*)malloc(15);
   cout << "trying to get name: " << endl;
-  int nameLen = (int)Rio_readlineb(&rio, clientRequest, 15);
-  cout << "deteccted name: " << name << endl;
+  int nameLen = (int)Rio_readnb(&rio, name, 15);
+  cout << "deteccted name: " << name << " " << nameLen << endl;
 
   // Read in the variable name, the value length, and the value.
   string varName(&clientRequest[0]);
@@ -335,6 +334,8 @@ const string &getRequestTypeName(MessageType request) {
 // Actual server functionality.
 //==============================
 
+int _port;
+
 void handleClient(int connfd, unsigned int secretKey) {
   // Read in the client's request and parse it.
   char clientRequest[MAX_REQUEST_SIZE];
@@ -344,8 +345,10 @@ void handleClient(int connfd, unsigned int secretKey) {
   // only read preamble -- rest will be handled later
   // as it has variable length
   int requestLen = (int)Rio_readnb(&rio, clientRequest, 8);
+  //Close(connfd);
   cout << "done reading (" << requestLen << ")" << endl;
 
+  for (int i = 0; i < 8; ++i) cout << (int) clientRequest[i] << endl;
   // TODO: Handle the case where we got a too-short request.
   if (requestLen < CLIENT_PREAMBLE_SIZE)
     cout << "WARNING: request too short: " << requestLen << endl;
@@ -356,13 +359,53 @@ void handleClient(int connfd, unsigned int secretKey) {
   unsigned int theirKey = ntohl(preamble.secretKey);
   MessageType rqType = (MessageType)ntohs(preamble.msgType);
 
-  // TODO: Do something if the client's secret key isn't right.
+  bool responseSuccess = 0;
+  int responselen = 0;
+  char *response = "";
   if (theirKey != secretKey) {
 	  cout << "Incorrect Key; Access denied." << endl;
-	  exit(1);
-  };
+	  Close(connfd);
+  }
 
   // Handle the actual request.
+	
+
+	else if (rqType == 0) //set response
+	{
+		char *name = (char*)malloc(15);
+		int l = (int)Rio_readnb(&rio, name, 15);
+		printf(name);
+		printf("\n");
+
+		short len;
+		Rio_readnb(&rio, (void *)&len, 2);
+		printf("len: %d\n", len);
+
+		char *val = (char *)malloc(len);
+		Rio_readnb(&rio, (void *)val, len);
+		
+		printf("val:");printf(val);
+
+		storedVars[name] = val;
+	} else if (rqType == 1) // get response
+	{
+		char *name = (char *)malloc(15);
+		Rio_readnb(&rio, name, 15);
+		cout << "name: " << name << endl;
+		
+		if (storedVars.find(name) == storedVars.end())
+			responseSuccess = 1;
+		else
+		{
+			response = const_cast<char *>(storedVars[name].c_str());
+			responselen = storedVars[name].length();
+		}
+
+	}
+
+	cout << "response: " << response << endl;
+
+	return;
   ResponseFunction handler = lookupHandler(rqType);
 
   string detail;
@@ -400,13 +443,11 @@ int main(int argc, char *argv[]) {
       parseIntWithError(argv[2], "Error: Secret key must be a number.\n");
 
   initRequestTypeNames();
+  _port = port;
 
   // BEGIN SHAMELESSLY COPIED CODE
-  int listenfd, connfd, listenPort;
+  int listenfd, connfd;
   sockaddr_in clientAddr;
-  hostent *clientHostEntry;
-  char *clientIP;
-  unsigned short clientPort;
   listenfd = Open_listenfd(port);
   socklen_t addrLength = sizeof(clientAddr);
 

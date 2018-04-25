@@ -26,12 +26,15 @@ printf("attempting to send a message of length %d\n", messageLength);
   clientfd = Open_clientfd(machineName, port);
   Rio_readinitb(&rio, clientfd);
   printf("got fd of %d\n", clientfd);
+  printf("len %d\n", messageLength);
 
   // Write our message, get the response, then clean up.
-  Rio_writen(clientfd, message, messageLength);
+  messageLength = 8;
+  Rio_writen(clientfd, (void*)message, 8);
   printf("wrote to server...");
-  Rio_readnb(&rio, response, maxResponseSize);
-  Close(clientfd);
+  //Close(clientfd);
+//Rio_readnb(&rio, response, maxResponseSize);
+  //Close(clientfd);
 printf("successfully sent a message of length %d\n", messageLength);
 }
 
@@ -39,7 +42,7 @@ printf("successfully sent a message of length %d\n", messageLength);
 // on the server at MachineName:port, where value is some data of length
 // `dataLength`.
 int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
-             char *value, int dataLength) {
+             char *value, short dataLength) {
   // Set up some variable names ahead of time.
   int varNameLength = strlen(variableName);
 
@@ -64,13 +67,31 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
   // Send our message and get the server's response.
   ServerResponse response;
 
-  printf("SENDING PREAMBLE");
-  sendMessage(MachineName, port, &message.pre, messageLength, &response,
-              sizeof(response));
-  printf("SENDING NAME");
-  sendMessage(MachineName, port, &message.varName, messageLength, &response,
-              sizeof(response));
+  int clientfd;
+  rio_t rio;
 
+  // Open a connection and set up the Rio type thing. We don't need to check
+  // for errors; Rio does it for us.
+  clientfd = Open_clientfd(MachineName, port);
+  Rio_readinitb(&rio, clientfd);
+
+  // Write our message, get the response, then clean up.
+  Rio_writen(clientfd, &message.pre, 8);
+  //Close(clientfd);
+//Rio_readnb(&rio, response, maxResponseSize);
+  //Close(clientfd);
+//printf("successfully sent a message of length %d\n", messageLength);
+
+  //printf("SENDING PREAMBLE\n");
+  //sendMessage(MachineName, port, &message.pre, 8, &response,
+  //            sizeof(response));
+	
+  //printf("SENDING NAME\n");
+  //sendMessage(MachineName, port, "123456789012345", MAX_VARNAME_LENGTH, &response,
+   //           sizeof(response));
+	Rio_writen(clientfd, message.varName, 15);
+	Rio_writen(clientfd, (void *)&dataLength, 2);
+	Rio_writen(clientfd, (void *)value, dataLength);
   // Read and return the server's return code.
   int returnCode = (int)response.status;
 
@@ -98,15 +119,23 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
   memcpy(&message.varName, variableName, varNameLength + 1);
 
   // Read the response, copy it, and close the connection.
-  ServerResponse response;
-  sendMessage(MachineName, port, &message.pre, messageLength, &response,
-              sizeof(response));
+ int clientfd;
+  rio_t rio;
+
+  // Open a connection and set up the Rio type thing. We don't need to check
+  // for errors; Rio does it for us.
+  clientfd = Open_clientfd(MachineName, port);
+  Rio_readinitb(&rio, clientfd);
+
+  Rio_writen(clientfd, &message.pre, 8);
+	Rio_writen(clientfd, variableName, 15);
+  // Read and return the server's return code.
 
   // Read and return the server's return code.
-  int returnCode = (int)response.status;
+  //int returnCode = (int)response.status;
 
   // If we got a failure result, exit early with that result.
-  if (returnCode < 0)
+  /*aif (returnCode < 0)
     return returnCode;
 
   // Get the length specifier.
@@ -128,7 +157,8 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
   if (resultLength != NULL)
     *resultLength = valueLen;
 
-  return returnCode;
+  return returnCode;*/
+	return 0;
 }
 
 // Get the SHA256 checksum of `data` on the server at MachineName:port and

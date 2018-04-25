@@ -1,7 +1,7 @@
 // Set the value of variable `variableName` to value on the server at
 // MachineName:port, where value is some data of length `dataLength`.
 int smallSet(char *MachineName, int port, int SecretKey,
-        char *variableName, char *value, int dataLength);
+        char *variableName, char *value, short dataLength);
 
 // Get the value of variable `variableName` on the server at MachineName:port,
 // writing the result to `value` and storing the length of the result into the
