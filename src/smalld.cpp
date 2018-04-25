@@ -361,7 +361,7 @@ void handleClient(int connfd, unsigned int secretKey) {
   unsigned int theirKey = ntohl(preamble.secretKey);
   MessageType rqType = (MessageType)ntohs(preamble.msgType);
 
-  bool responseSuccess = 0;
+  bool responseSuccess = true;
   int responselen = 0;
   char *response = "";
   if (theirKey != secretKey) {
@@ -396,7 +396,7 @@ void handleClient(int connfd, unsigned int secretKey) {
 		cout << "name: " << name << endl;
 		
 		if (storedVars.find(name) == storedVars.end())
-			responseSuccess = 1;
+			responseSuccess = false;
 		else
 		{
 			response = const_cast<char *>(storedVars[name].c_str());
@@ -413,6 +413,7 @@ void handleClient(int connfd, unsigned int secretKey) {
 		if (n > 100)
 		{
 			cerr << "message cannot be >100 chars long" << endl;
+			responseSuccess = false;
 		}
 		else
 		{
@@ -421,12 +422,23 @@ void handleClient(int connfd, unsigned int secretKey) {
 			Rio_readnb(&rio, str, n);
 			cout << "read " << str << endl;
 			response = const_cast<char*>(digest(n, str));
-			responselen = n;
+			responselen = 100;
 			cout << str << " -> " << response << endl;
 		}
 	}
 
 	cout << "response: " << response << endl;
+
+	char returnCode = responseSuccess ? 0 : -1;
+	Rio_writen(connfd, (void*)&returnCode, 1);
+	Rio_writen(connfd, const_cast<char *>("01"), 3); //padding ?? why??
+	
+	if (responselen > 0)
+	{
+		Rio_writen(connfd, &responselen, 2);
+		Rio_writen(connfd, response, responselen);
+	}
+
 
 	return;
   ResponseFunction handler = lookupHandler(rqType);

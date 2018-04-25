@@ -33,6 +33,6 @@ int main(int argc, char *argv[]) {
 
   if (success != 0)
     fprintf(stderr, "failed\n");
-  else
-    printf("%s\n", resultBuf);
+ // else
+   // printf("%s\n", resultBuf);
 }

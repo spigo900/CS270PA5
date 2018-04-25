@@ -93,9 +93,14 @@ int smallSet(char *MachineName, int port, int SecretKey, char *variableName,
 	Rio_writen(clientfd, (void *)&dataLength, 2);
 	Rio_writen(clientfd, (void *)value, dataLength);
   // Read and return the server's return code.
-  int returnCode = (int)response.status;
+  	
+	char rval;
+  	Rio_readnb(&rio, &rval, 1);
 
-  return returnCode;
+	char pad[3];
+	Rio_readnb(&rio, pad, 3);
+	printf("rval: %d\n", rval);
+  return rval;
 }
 
 // Get the value of variable `variableName` (a null-terminated string) on the
@@ -158,7 +163,27 @@ int smallGet(char *MachineName, int port, int SecretKey, char *variableName,
     *resultLength = valueLen;
 
   return returnCode;*/
-	return 0;
+	char rval;
+  	Rio_readnb(&rio, &rval, 1);
+
+	char pad[3];
+	Rio_readnb(&rio, pad, 3);
+
+	printf("rval: %d\n", rval);
+	
+	short len;
+	Rio_readnb(&rio, &len, 2);
+	printf("len : %d\n", len);
+
+	char *val = (char*)malloc(len+1);
+	val[len] = 0;
+	Rio_readnb(&rio, val, len);
+	
+	printf(val);
+	printf("X\n");
+
+
+	return rval;
 }
 
 // Get the SHA256 checksum of `data` on the server at MachineName:port and
@@ -220,6 +245,27 @@ int smallDigest(char *MachineName, int port, int SecretKey, char *data,
   if (resultLength != NULL)
     *resultLength = resultLen;
 
+	char rval;
+  	Rio_readnb(&rio, &rval, 1);
+
+	char pad[3];
+	Rio_readnb(&rio, pad, 3);
+
+	printf("rval: %d\n", rval);
+	
+	short len;
+	Rio_readnb(&rio, &len, 2);
+	printf("len : %d\n", len);
+
+	char *val = (char*)malloc(len+1);
+	val[len] = 0;
+	Rio_readnb(&rio, val, len);
+	
+	printf(val);
+	printf("X\n");
+
+
+	return rval;
   return returnCode;
 }
 
